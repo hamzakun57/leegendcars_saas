@@ -8,7 +8,8 @@
 
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-agency-id, x-agency-slug",
+  "Access-Control-Max-Age": "86400",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 

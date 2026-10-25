@@ -108,7 +108,11 @@
   }
 
   async function appelerFonction(nom, corps, delai = DELAI_FONCTION) {
-    const { data, error } = await getClient().functions.invoke(nom, { body: corps, timeout: delai });
+    const fHeaders = {};
+    const aId = agencyId();
+    if (aId) fHeaders["x-agency-id"] = aId;
+    if (CFG.agencySlug) fHeaders["x-agency-slug"] = CFG.agencySlug;
+    const { data, error } = await getClient().functions.invoke(nom, { body: corps, headers: fHeaders, timeout: delai });
     if (!error) return data;
 
     const message = (error.message || "").trim();
@@ -118,7 +122,7 @@
     if (/relay/i.test(message)) {
       throw new Error("Le service d'envoi est momentanément indisponible. Réessayez dans un instant.");
     }
-    if (/abort|timed ?out|timeout|failed to send/i.test(message)) {
+    if (/abort|timed ?out|timeout/i.test(message)) {
       throw new Error("Le service d'envoi ne répond plus. Réessayez avec des photos plus légères.");
     }
 
