@@ -153,12 +153,21 @@ app.post("/sign/:token", h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+const isSupabaseAuth =
+  process.env.SAAS_DATA_SOURCE === "supabase" ||
+  Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+
 app.get("/admin/login", h(async (req, res) => {
-  if (req.user) return res.redirect("/admin");
-  res.send(loginPage(await needsSetup()));
+  if (!isSupabaseAuth && req.user) return res.redirect("/admin");
+  res.send(loginPage(isSupabaseAuth ? false : await needsSetup()));
 }));
 
-app.get("/admin", requireAdminPage, (_req, res) => res.send(adminShell()));
+app.get(["/admin", "/admin/"], (req, res) => {
+  if (isSupabaseAuth) {
+    return res.send(adminShell());
+  }
+  return requireAdminPage(req, res, () => res.send(adminShell()));
+});
 
 /* ---------- public site (static) ---------- */
 /* Only the site itself is public. Everything under server/, node_modules/ and the

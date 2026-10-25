@@ -53,7 +53,8 @@
       : memberships[0];
     if (!selected) throw new Error("Ce compte n'appartient pas à cette agence.");
     localStorage.setItem("lc_agency_id", selected.agency_id);
-    localStorage.setItem("lc_agency_slug", selected.agencies.slug);
+    const slug = Array.isArray(selected.agencies) ? selected.agencies[0]?.slug : selected.agencies?.slug;
+    localStorage.setItem("lc_agency_slug", slug || "");
   };
 
   const form = $("#f");
