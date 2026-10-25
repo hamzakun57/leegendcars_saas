@@ -55,7 +55,8 @@ app.use((_req, res, next) => {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "img-src 'self' data:",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      "img-src 'self' data: blob: https://*.supabase.co",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "script-src 'self'",

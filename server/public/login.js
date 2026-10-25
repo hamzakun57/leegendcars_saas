@@ -93,7 +93,7 @@
         const { data, error } = await getClient().auth.signInWithPassword({ email, password });
         if (error || !data?.user) {
           if (bouton) bouton.disabled = false;
-          return msg("E-mail ou mot de passe incorrect.");
+          return msg(error?.message || "E-mail ou mot de passe incorrect.");
         }
         await choisirAgence(data.user);
         /* Connecté, mais peut-être pas administrateur : la page d'accueil
