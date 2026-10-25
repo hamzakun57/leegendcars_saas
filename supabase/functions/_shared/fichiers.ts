@@ -91,7 +91,15 @@ export type FichierValide = { nom: string; chemin: string; mime: string; taille:
  * Valide un fichier et lui attribue un nom inexploitable.
  * @param sousDossier dossier dans le bucket (« » ou « reservations »)
  */
-export function valider(dataUrl: unknown, { max = MAX_DOC, allowPdf = false, sousDossier = "" } = {}): FichierValide {
+export function valider(
+  dataUrl: unknown,
+  { max = MAX_DOC, allowPdf = false, sousDossier = "", agencyId = "" }: {
+    max?: number;
+    allowPdf?: boolean;
+    sousDossier?: string;
+    agencyId?: string;
+  } = {}
+): FichierValide {
   if (typeof dataUrl !== "string" || !dataUrl) throw new Error("fichier vide");
 
   const contenu = decoder(dataUrl);
@@ -117,8 +125,12 @@ export function valider(dataUrl: unknown, { max = MAX_DOC, allowPdf = false, sou
      Un niveau de trop et l'image est introuvable, sans la moindre erreur. */
 const bucket = sousDossier === DOSSIER_PHOTOS ? BUCKET_PHOTOS : BUCKET;
   const chemin = sousDossier === DOSSIER_PHOTOS
-    ? `${bucket}/${nom}`
-    : sousDossier
+    ? agencyId
+      ? `${bucket}/${DOSSIER_PHOTOS}/${agencyId}/${nom}`
+      : `${bucket}/${nom}`
+    : agencyId
+      ? `${bucket}/${agencyId}/${sousDossier || "documents"}/${nom}`
+      : sousDossier
       ? `${bucket}/${sousDossier}/${nom}`
       : `${bucket}/${nom}`;
   return { nom, chemin, mime, taille: contenu.length, contenu };
@@ -162,10 +174,12 @@ export async function envoyer(client: any, fichier: FichierValide): Promise<Fich
  * et n'obtiendrait jamais d'image. Les pièces de dossier, privées, gardent un
  * chemin relatif — l'ancien serveur les lisait, et seul lui y a accès.
  */
-export const cheminPublic = (sousDossier: string, nom: string) => {
+export const cheminPublic = (sousDossier: string, nom: string, agencyId = "") => {
   /* Bucket « photos », clé « photos/<nom> » : l'URL porte donc les deux. */
   if (sousDossier === DOSSIER_PHOTOS) {
-    const cle = `${BUCKET_PHOTOS}/${sousDossier}/${nom}`;
+    const cle = agencyId
+      ? `${BUCKET_PHOTOS}/${sousDossier}/${agencyId}/${nom}`
+      : `${BUCKET_PHOTOS}/${sousDossier}/${nom}`;
     return `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/${cle}`;
   }
   return sousDossier ? `${BUCKET}/${sousDossier}/${nom}` : `${BUCKET}/${nom}`;
@@ -174,10 +188,8 @@ export const cheminPublic = (sousDossier: string, nom: string) => {
 /**
  * Normalise un nom de fichier en clé de stockage, ou renvoie null.
  *
- * Le contrat ne change pas : « photo.jpg » → « uploads/photo.jpg ». Deux formes
- * supplémentaires sont désormais admises, toutes deux strictly encadrées :
- *   - une clé de pièce de dossier déjà préfixée (« uploads/reservations/… ») ;
- *   - l'URL publique d'une photo de flotte, dont on ne garde que la clé.
+ * Les clés tenant-aware portent l'UUID de l'agence dans le chemin; les anciennes
+ * formes restent reconnues pour le nettoyage contrôlé des fichiers importés.
  *
  * Aucun segment « .. », aucun préfixe inconnu : la valeur renvoyée est
  * reconstruite, jamais recopiée telle quelle.
@@ -206,5 +218,12 @@ export function nomSure(nom: unknown): string | null {
   if (reste.length === 1) return `${bucket}/${reste[0]}`;
   if (reste.length === 2 && reste[0] === "reservations") return `${bucket}/reservations/${reste[1]}`;
   if (reste.length === 2 && reste[0] === DOSSIER_PHOTOS) return `${BUCKET_PHOTOS}/${reste[1]}`;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (reste.length === 3 && uuid.test(reste[0]) && ["reservations", "documents"].includes(reste[1])) {
+    return `${bucket}/${reste[0]}/${reste[1]}/${reste[2]}`;
+  }
+  if (bucket === BUCKET_PHOTOS && reste.length === 3 && reste[0] === DOSSIER_PHOTOS && uuid.test(reste[1])) {
+    return `${BUCKET_PHOTOS}/${reste[0]}/${reste[1]}/${reste[2]}`;
+  }
   return null;
 }

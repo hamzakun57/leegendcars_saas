@@ -12,9 +12,11 @@ import { JSDOM } from "jsdom";
 
 let pass = 0, fail = 0;
 const check = (n, ok, extra = "") => { console.log(`${ok ? "  OK  " : "ECHEC"} ${n}${extra ? " — " + extra : ""}`); ok ? pass++ : fail++; };
+let testReservationLastName = "";
 
 const SB = process.env.SUPABASE_URL.replace(/\/+$/, "");
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+process.env.TZ = "Pacific/Auckland";
 const admin = (chemin, opts = {}) =>
   fetch(`${SB}/rest/v1/${chemin}`, {
     ...opts,
@@ -47,19 +49,28 @@ class IntersectionObserver {
 }
 w.IntersectionObserver = IntersectionObserver;
 
-/* Un véhicule de travail, pour que le scénario ait de la matière. */
+/* Véhicules de travail pour vérifier aussi le tri public par ordre d'affichage. */
 const VEHICULE = "essai-client-direct";
-await admin(`vehicles?slug=eq.${VEHICULE}`, { method: "DELETE" });
-await admin("vehicles", {
-  method: "POST",
-  headers: { Prefer: "return=minimal" },
-  body: JSON.stringify({
-    slug: VEHICULE, name: "Essai Direct", tagline: "Automatique", transmission: "Automatique",
-    fuel: "Essence", doors: 5, seats: 5, price_from: 500, deposit: 5000, approx: 50,
-    tiers: [{ days: 7, price: 400 }], gallery: "[]", description: "[]", ideal_for: "[]",
-    active: 1, en_service: 1, sort_order: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  }),
-});
+const VEHICULE_ORDRE = ["essai-client-direct-ordre-a", "essai-client-direct-ordre-b", "essai-client-direct-ordre-c"];
+const maintenant = new Date().toISOString();
+for (const slug of [VEHICULE, ...VEHICULE_ORDRE]) await admin(`vehicles?slug=eq.${slug}`, { method: "DELETE" });
+for (const [slug, name, sort_order] of [
+  [VEHICULE, "Essai Direct", 0],
+  [VEHICULE_ORDRE[0], "Essai Ordre A", 1],
+  [VEHICULE_ORDRE[1], "Essai Ordre B", 2],
+  [VEHICULE_ORDRE[2], "Essai Ordre C", 3],
+]) {
+  await admin("vehicles", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      slug, name, tagline: "Automatique", transmission: "Automatique",
+      fuel: "Essence", doors: 5, seats: 5, price_from: 500, deposit: 5000, approx: 50,
+      tiers: [{ days: 7, price: 400 }], gallery: "[]", description: "[]", ideal_for: "[]",
+      active: 1, en_service: 1, sort_order, created_at: maintenant, updated_at: maintenant,
+    }),
+  });
+}
 
 try {
   /* Les fichiers sont lus dans l'ordre EXACT où index.html les charge. La liste
@@ -103,6 +114,19 @@ try {
       try {
         const flotte = await window.LCData.vehicles();
         note("lecture de la flotte", Array.isArray(flotte.vehicles), flotte.vehicles.length + " vehicule(s)");
+        const positionsOrdre = ${JSON.stringify(VEHICULE_ORDRE)}.map((slug) => flotte.vehicles.findIndex((v) => v.slug === slug));
+        const positionSansOrdre = flotte.vehicles.findIndex((v) => v.slug === "${VEHICULE}");
+        note("ordre d'affichage respecte dans la flotte publique",
+          positionsOrdre.every((position) => position >= 0) &&
+            positionsOrdre[0] < positionsOrdre[1] && positionsOrdre[1] < positionsOrdre[2] &&
+            positionsOrdre[2] < positionSansOrdre,
+          [...positionsOrdre, positionSansOrdre].join(" < "));
+        const rangsOrdre = ${JSON.stringify(VEHICULE_ORDRE)}.map(
+          (slug) => flotte.vehicles.find((v) => v.slug === slug)?.sort_order
+        );
+        note("ordre numerique expose et croissant",
+          rangsOrdre[0] === 1 && rangsOrdre[1] === 2 && rangsOrdre[2] === 3,
+          rangsOrdre.join(" < "));
         /* Le véhicule de travail, et non le premier venu : la base est celle de
            l'agence, elle contient ses véhicules, aux prix que l'agence a
            choisis. Les montants attendus ci-dessous n'ont de sens qu'avec
@@ -118,18 +142,6 @@ try {
         const siege = await window.LCData.pricing({ vehicle: v.slug, from: "2026-11-02", to: "2026-11-09", babySeat: 2 });
         note("siege bebe facture", siege.total === p.total + 2 * p.days, siege.total + " MAD");
 
-        const res = await window.LCData.envoyerReservation({
-          firstName: "Navigateur", lastName: "Direct", phone: "+212612345678",
-          licenceNumber: "AB123456", licenceDate: "2015-04-01",
-          pickup: "Tanger", ret: "Tanger",
-          pickupDate: "2026-12-01", returnDate: "2026-12-05",
-          pickupTime: "10:00", returnTime: "10:00",
-          countryCode: "+212", babySeat: 0, vehicleSlug: v.slug,
-        });
-        note("demande acceptee", res.ok === true && /^LC-/.test(res.ref || ""), res.ref || res.error);
-        note("totaux renvoyes", res.days === 4 && res.total === 2000, res.days + " j, " + res.total + " MAD");
-        window.__ref = res.ref;
-
         const mauvais = await window.LCData.envoyerReservation({ firstName: "", lastName: "X" });
         note("formulaire incomplet refuse", mauvais.ok === false && mauvais.fields.includes("firstName"), (mauvais.fields || []).join(","));
       } catch (e) {
@@ -141,18 +153,79 @@ try {
 
   for (const r of resultat) check(r.nom, r.ok, r.extra);
 
+  let formClientReservation = null;
+  const limiteRendu = Date.now() + 10000;
+  while (!formClientReservation && Date.now() < limiteRendu) {
+    if (!w.DATA.VEHICLES.some((vehicle) => vehicle.slug === VEHICULE)) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      continue;
+    }
+    w.document.documentElement.lang = "en-US";
+    w.location.hash = `#/vehicules/${VEHICULE}`;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    formClientReservation = w.document.querySelector("[data-rform]");
+  }
+  check("formulaire client de réservation affiché", !!formClientReservation);
+  let ref = "";
+  if (formClientReservation) {
+    const saisie = {
+      firstName: "Navigateur",
+      lastName: `Formulaire${Date.now()}`,
+      phone: "612345678",
+      licenceNumber: "AB123456",
+      licenceDate: "2015-04-01",
+      pickup: "Tanger",
+      ret: "Tanger",
+      pickupDate: "2026-12-01",
+      pickupTime: "10:00",
+      returnDate: "2026-12-05",
+      returnTime: "10:00",
+      babySeat: "0",
+      notes: "",
+      botcheck: "",
+    };
+    testReservationLastName = saisie.lastName;
+    for (const [name, value] of Object.entries(saisie)) {
+      const input = formClientReservation.elements.namedItem(name);
+      if (input) input.value = value;
+    }
+    const datesTransmises = ["licenceDate", "pickupDate", "returnDate"].map((name) =>
+      formClientReservation.elements.namedItem(name).value
+    );
+    check("formulaire client transmet les dates ISO malgré la langue en-US",
+      datesTransmises.join(",") === "2015-04-01,2026-12-01,2026-12-05",
+      datesTransmises.join(", "));
+
+    formClientReservation.dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }));
+    const limiteEnvoi = Date.now() + 20000;
+    while (!ref && Date.now() < limiteEnvoi) {
+      try {
+        ref = JSON.parse(w.sessionStorage.getItem("lc_reservation") || "{}").ref || "";
+      } catch {}
+      if (!ref) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const demande = JSON.parse(w.sessionStorage.getItem("lc_reservation") || "{}");
+    check("création via le formulaire client avec les dates locales",
+      !!ref && demande.licenceDate === "2015-04-01" &&
+        demande.pickupDate === "2026-12-01" && demande.returnDate === "2026-12-05",
+      ref || formClientReservation.querySelector("[data-form-alert]")?.textContent || "délai dépassé");
+  }
+
   /* Ce que la base a réellement retenu, lu hors RLS avec la clé de service. */
-  const ref = w.__ref;
   if (ref) {
     const r = await admin(`reservations?ref=eq.${ref}&select=*`);
     const [ligne] = await r.json();
-    check("demande bien enregistree", !!ligne, ref);
+    check("demande formulaire client bien enregistrée", !!ligne, ref);
+    check("date du permis conservée sans décalage", ligne?.licence_date === "2015-04-01", ligne?.licence_date);
+    check("dates de réservation conservées sans décalage",
+      ligne?.pickup_date === "2026-12-01" && ligne?.return_date === "2026-12-05",
+      `${ligne?.pickup_date} → ${ligne?.return_date}`);
     check("statut force a « nouvelle »", ligne?.status === "nouvelle", ligne?.status);
     check("total calcule (4 j x 500)", ligne?.total === 2000, String(ligne?.total));
     check("aucun encaissement invente", ligne?.total_paid === 0, String(ligne?.total_paid));
     check("aucun numero de contrat", !ligne?.contract_number, ligne?.contract_number);
     check("aucune signature", !ligne?.signature_data);
-    check("resume lisible", String(ligne?.summary || "").includes("Navigateur Direct"));
+    check("resume lisible", String(ligne?.summary || "").includes("Navigateur Formulaire"));
     await admin(`reservations?ref=eq.${ref}`, { method: "DELETE" });
   }
 
@@ -168,8 +241,10 @@ try {
 } catch (e) {
   check("erreur de test", false, e.message);
 } finally {
-  await admin(`vehicles?slug=eq.${VEHICULE}`, { method: "DELETE" });
-  await admin(`reservations?ref=like.LC-*&created_by=eq.`, { method: "DELETE" });
+  if (testReservationLastName) {
+    await admin(`reservations?last_name=eq.${encodeURIComponent(testReservationLastName)}`, { method: "DELETE" });
+  }
+  for (const slug of [VEHICULE, ...VEHICULE_ORDRE]) await admin(`vehicles?slug=eq.${slug}`, { method: "DELETE" });
 }
 
 console.log(`\n${pass} reussis, ${fail} echecs`);

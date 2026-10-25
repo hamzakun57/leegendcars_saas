@@ -73,13 +73,14 @@ let cookieServeur = "";
 }
 
 /* ---------- session côté navigateur simulé ---------- */
+process.env.TZ = "Pacific/Auckland";
 const dom = new JSDOM("<html></html>", { url: "https://leegendcars.netlify.app/admin", runScripts: "outside-only" });
 const w = dom.window;
 w.fetch = globalThis.fetch;
 w.console = console;
 /* JSDOM ne sait pas naviguer et fournit déjà un localStorage : on n'y touche
    pas, le test s'en sert comme un vrai navigateur. */
-for (const f of ["vendor/supabase.js", "server/public/admin-config.js", "server/public/admin-api.js"]) {
+for (const f of ["vendor/supabase.js", "server/public/admin-config.js", "shared/date-utils.js", "server/public/admin-api.js"]) {
   w.eval(readFileSync(f, "utf8"));
 }
 check("adaptateur présent", !!w.LCAdmin);
@@ -88,12 +89,77 @@ check("mode « supabase »", w.LCAdmin?.mode === "supabase", w.LCAdmin?.mode);
 /* Déclaré hors du bloc d'essai : le finally doit pouvoir nettoyer même si le
    test échoue avant la création du véhicule de travail. */
 let voitureCreee = null;
+let nomPieceTest = "";
+let clientTestId = null;
 
 try {
   /* Connexion : elle seule passe par l'adaptateur (le serveur a son ancien
      mécanisme, volontairement conservé). */
   const connexion = await w.eval(`window.LCAdmin.api("/api/admin/login", { method: "POST", body: { email: ${JSON.stringify(EMAIL)}, password: ${JSON.stringify(PASS)} } })`);
   check("connexion administrateur", connexion && connexion.ok === true);
+  const [flotteServeur, flotteSupabase] = await Promise.all([
+    fetch(`${B}/api/admin/vehicles`, { headers: { cookie: cookieServeur } }).then((r) => r.json()),
+    w.eval(`window.LCAdmin.api("/api/admin/vehicles")`),
+  ]);
+  const ordreValide = (liste) => liste.every((vehicule, index) => {
+    if (index === 0) return true;
+    const precedent = liste[index - 1];
+    const rang = (v) => Number(v.sort_order) > 0 ? Number(v.sort_order) : Number.MAX_SAFE_INTEGER;
+    return rang(precedent) < rang(vehicule) ||
+      (rang(precedent) === rang(vehicule) &&
+        String(precedent.name || "").localeCompare(String(vehicule.name || ""), "fr", { sensitivity: "base" }) <= 0);
+  });
+  check("tri flotte serveur : rangs positifs puis 0", ordreValide(flotteServeur.vehicles));
+  check("tri flotte Supabase : rangs positifs puis 0", ordreValide(flotteSupabase.vehicles));
+  const datesClientTest = {
+    client_type: "particulier",
+    last_name: `Dates${Date.now()}`,
+    first_name: "Test",
+    birthdate: "1990-05-12",
+    licence_date: "2012-06-13",
+    cin_date: "2018-07-14",
+    passport_date: "2020-08-15",
+    entry_date: "2024-09-16",
+  };
+  const creationClient = await w.eval(
+    `window.LCAdmin.api("/api/admin/clients", { method: "POST", body: ${JSON.stringify(datesClientTest)} })`,
+  );
+  clientTestId = creationClient?.client?.id || null;
+  check("création client avec les dates saisies", !!clientTestId);
+  if (clientTestId) {
+    const datesRelues = await w.eval(`window.LCAdmin.api("/api/admin/clients?q=${encodeURIComponent(datesClientTest.last_name)}")`);
+    const clientRelu = datesRelues.clients.find((client) => client.id === clientTestId);
+    check("toutes les dates client sont conservées",
+      !!clientRelu &&
+        ["birthdate", "licence_date", "cin_date", "passport_date", "entry_date"]
+          .every((field) => clientRelu[field] === datesClientTest[field]));
+    await w.eval(
+      `window.LCAdmin.api("/api/admin/clients/${clientTestId}", { method: "PATCH", body: { birthdate: "1991-10-17", licence_date: "2013-11-18", cin_date: "2019-12-19", passport_date: "2021-01-20", entry_date: "2025-02-21" } })`,
+    );
+    const updatedClient = await w.eval(`window.LCAdmin.api("/api/admin/clients?q=${encodeURIComponent(datesClientTest.last_name)}")`);
+    const clientMisAJour = updatedClient.clients.find((client) => client.id === clientTestId);
+    check("modification des dates client conservée",
+      !!clientMisAJour &&
+        ["birthdate", "licence_date", "cin_date", "passport_date", "entry_date"]
+          .every((field, index) => clientMisAJour[field] === ["1991-10-17", "2013-11-18", "2019-12-19", "2021-01-20", "2025-02-21"][index]));
+  }
+  let refusDateInvalide = "";
+  try {
+    await w.eval(
+      `window.LCAdmin.api("/api/admin/clients", { method: "POST", body: { last_name: "DateInvalide", birthdate: "2023-02-29" } })`,
+    );
+  } catch (e) {
+    refusDateInvalide = e.message;
+  }
+  check("date réellement impossible refusée", /date client est invalide/i.test(refusDateInvalide), refusDateInvalide);
+  let refusMotDePasseActuel = "";
+  try {
+    await w.eval(`window.LCAdmin.api("/api/admin/password", { method: "POST", body: { current: "mot-de-passe-incorrect", next: "nouveau-test-123" } })`);
+  } catch (e) {
+    refusMotDePasseActuel = e.message;
+  }
+  check("changement de mot de passe vérifie le mot de passe actuel",
+    refusMotDePasseActuel === "Mot de passe actuel incorrect.", refusMotDePasseActuel);
 
   const moi = await fetch(`${B}/api/admin/me`, { headers: { cookie: cookieServeur } }).then((r) => r.json());
   const moiAdaptateur = await w.eval(`window.LCAdmin.api("/api/admin/me")`);
@@ -151,6 +217,28 @@ try {
 
   if (creation.ok) {
     const id = creation.reservation.id;
+
+    /* La suppression des pièces jointes passe par cette route Netlify avant
+       d'appeler le stockage. Vérifier la vraie requête évite qu'une route
+       invalide laisse silencieusement les pièces visibles. */
+    const pngTest = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const ajoutPiece = await w.eval(
+      `window.LCAdmin.api("/api/admin/reservations/${id}/attachments", { method: "POST", body: { kind: "piece", name: "Test suppression", files: [${JSON.stringify(pngTest)}] } })`,
+    );
+    const pieceTest = ajoutPiece?.attachments?.[0];
+    nomPieceTest = pieceTest?.stored_name || "";
+    check("pièce jointe de test téléversée", !!pieceTest?.id && !!nomPieceTest);
+    if (pieceTest?.id) {
+      let erreurSuppressionPiece = "";
+      try {
+        await w.eval(`window.LCAdmin.api("/api/admin/attachments/${pieceTest.id}", { method: "DELETE" })`);
+      } catch (e) {
+        erreurSuppressionPiece = e.message;
+      }
+      const dossierApresSuppression = await w.eval(`window.LCAdmin.api("/api/admin/reservations/${id}")`);
+      check("suppression d'une pièce via l'adaptateur", !dossierApresSuppression.reservation.attachments.some((a) => a.id === pieceTest.id), erreurSuppressionPiece);
+    }
+
     /* Un règlement : le dossier doit exposer « payments » et « totalPaid ». */
     await fetch(`${B}/api/admin/reservations/${id}/payments`, {
       method: "POST",
@@ -267,6 +355,18 @@ try {
      milieu laisserait sinon une voiture « Saisie <date> » dans la base de
      l'agence, et les suites suivantes échoueraient sur un parc non vide. */
   const jeton = { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json" };
+  if (clientTestId) {
+    await w.eval(`window.LCAdmin.api("/api/admin/clients/${clientTestId}", { method: "DELETE" })`).catch(() => {});
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      await fetch(`${process.env.SUPABASE_URL}/rest/v1/clients?id=eq.${clientTestId}`, { method: "DELETE", headers: jeton }).catch(() => {});
+    }
+  }
+  if (nomPieceTest) {
+    await fetch(
+      `${process.env.SUPABASE_URL}/storage/v1/object/uploads/uploads/reservations/${encodeURIComponent(nomPieceTest)}`,
+      { method: "DELETE", headers: jeton },
+    ).catch(() => {});
+  }
   await fetch(`${process.env.SUPABASE_URL}/rest/v1/vehicles?slug=like.saisie-*`, { method: "DELETE", headers: jeton }).catch(() => {});
   await fetch(`${process.env.SUPABASE_URL}/rest/v1/vehicles?slug=like.adaptateur-*`, { method: "DELETE", headers: jeton }).catch(() => {});
   if (voitureCreee) {

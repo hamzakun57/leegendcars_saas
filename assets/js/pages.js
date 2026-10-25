@@ -2,23 +2,18 @@
 (function () {
   const D = window.DATA;
   const I = window.Icons;
-  const { CFG, wa } = D;
+  const { CFG, wa, escapeHtml } = D;
+  const phoneLink = (value) => String(value || "").replace(/[^\d+().-]/g, "");
+  const mapsLink = () => {
+    try {
+      const url = new URL(CFG.mapsUrl);
+      return ["https:", "http:"].includes(url.protocol) ? url.href : "";
+    } catch {
+      return "";
+    }
+  };
 
   /* ---------- helpers ---------- */
-  const stars = (n) => {
-    let out = '<span class="stars" aria-hidden="true">';
-    for (let i = 1; i <= 5; i++) out += i <= n ? I.star() : "";
-    out += "</span>";
-    return out;
-  };
-
-  const starsEmpty = (n) => {
-    let out = '<span class="stars stars--empty" aria-hidden="true">';
-    for (let i = 1; i <= 5; i++) out += i <= n ? I.star() : "";
-    out += "</span>";
-    return out;
-  };
-
   const money = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
   const breadcrumb = (last, parent) => {
@@ -29,8 +24,8 @@
   };
 
   const callBtn = (label, cls) =>
-    `<a class="btn ${cls || "btn--primary"}" href="tel:${CFG.phonePrimaryTel}">${I.phone()}${label ||
-      ` Appeler ${CFG.phonePrimary}`}</a>`;
+    `<a class="btn ${cls || "btn--primary"}" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()}${label ||
+      ` Appeler ${escapeHtml(CFG.phonePrimary)}`}</a>`;
 
   /* Un véhicule saisi au back-office peut n'avoir aucune photo : sans garde-fou,
      la page produisait « <img src="undefined"> » et une icône cassée. Le visuel
@@ -70,7 +65,7 @@
       <div class="vehicle__glow" style="background:${v.accent}"></div>
       <span class="badge badge--top vehicle__badge-tech">${v.transmission}</span>
       <div class="vehicle__media">
-        <img src="${photo(v, 0)}" alt="${v.name} — location de voiture au Maroc" loading="lazy" />
+        <img src="${photo(v, 0)}" alt="${v.name} — location de voiture" loading="lazy" />
       </div>
       <div class="vehicle__body">
         <h3 class="vehicle__name">${v.name}</h3>
@@ -105,28 +100,6 @@
       )
       .join("")}</div>`;
 
-  const reviewCard = (r, idx) => {
-    const initials = r.name
-      .split(" ")
-      .map((s) => s[0])
-      .join("");
-    return `
-    <article class="review" data-reveal data-reveal-delay="${(idx % 3) + 1}">
-      <div class="review__top">
-        ${stars(r.rating)}
-        <span class="review__verified">${I.checkCircle()} Vérifié</span>
-      </div>
-      <p class="review__text">« ${r.text} »</p>
-      <div class="review__author">
-        <span class="review__avatar" style="background:${r.grad}">${initials}</span>
-        <span>
-          <span class="review__name">${r.name}</span><br />
-          <span class="review__car">A loué · ${r.car}</span>
-        </span>
-      </div>
-    </article>`;
-  };
-
   /* ---------- reservation form ---------- */
   const reservationForm = (vehicle) => {
     const countries = D.COUNTRY_CODES.map(
@@ -135,7 +108,7 @@
     ).join("");
 const locations = (selected) =>
       D.PICKUP_LOCATIONS.map(
-        (l) => `<option ${l === selected ? "selected" : ""}>${l}</option>`
+        (l) => `<option value="${escapeHtml(l)}" ${l === selected ? "selected" : ""}>${escapeHtml(l)}</option>`
       ).join("");
     return `
     <form class="rform" data-rform data-vehicle="${vehicle.name}" data-slug="${vehicle.slug}" data-price="${vehicle.priceFrom}" novalidate data-reveal>
@@ -192,11 +165,11 @@ const locations = (selected) =>
         <div class="rform__row">
           <div class="field">
             <label for="rf-pickup">Lieu de prise en charge <span>*</span></label>
-            <select id="rf-pickup" name="pickup" required>${locations("Tanger")}</select>
+            <select id="rf-pickup" name="pickup" required>${locations(D.PICKUP_LOCATIONS[0])}</select>
           </div>
           <div class="field">
             <label for="rf-return">Lieu de retour <span>*</span></label>
-            <select id="rf-return" name="ret" required>${locations("Tanger")}</select>
+            <select id="rf-return" name="ret" required>${locations(D.PICKUP_LOCATIONS[0])}</select>
           </div>
         </div>
         <p class="rform__notice" data-rform-oneway hidden>Retour dans une autre ville : un supplément aller-retour sera ajouté au tarif final.</p>
@@ -225,7 +198,7 @@ const locations = (selected) =>
             <label for="rf-seat">Siège bébé</label>
             <select id="rf-seat" name="babySeat">
               <option value="0" selected>Sans siège bébé</option>
-              <option value="${D.BABY_SEAT_DAILY}">Avec siège bébé (${D.BABY_SEAT_DAILY} MAD / jour)</option>
+              ${D.BABY_SEAT_DAILY > 0 ? `<option value="${D.BABY_SEAT_DAILY}">Avec siège bébé (${D.BABY_SEAT_DAILY} MAD / jour)</option>` : ""}
             </select>
           </div>
         </div>
@@ -250,7 +223,7 @@ const locations = (selected) =>
       <p class="note">Nous confirmons rapidement la disponibilité et le tarif final par téléphone.</p>
       <div data-form-alert></div>
       <button class="btn btn--primary btn--block btn--lg" type="submit">Envoyer la demande</button>
-      <p class="rform__legal">Tarif indicatif. Le prix final dépend des dates et de la durée de location. Cette demande ne constitue pas une réservation automatique. Votre demande est enregistrée et transmise directement à l'équipe Leegend Cars.</p>
+      <p class="rform__legal">Tarif indicatif. Le prix final dépend des dates et de la durée de location. Cette demande ne constitue pas une réservation automatique. Votre demande est enregistrée et transmise directement à l'équipe ${escapeHtml(CFG.brand)}.</p>
     </form>`;
   };
 
@@ -260,22 +233,22 @@ const locations = (selected) =>
       <div class="hero__media">
         <picture>
           <source media="(max-width: 767px)" srcset="mobile_background.jpg" />
-          <img src="pc_background.jpg" alt="Leegend Cars, service de location de voitures de luxe au Maroc" />
+          <img src="pc_background.jpg" alt="${escapeHtml(CFG.brand)}, service de location de voitures" />
         </picture>
         <div class="hero__overlay"></div>
       </div>
       <div class="container hero__inner">
-        <span class="hero__eyebrow"><span class="hero__pulse"></span> Disponible aujourd'hui · Pour tous les aéroports du Maroc</span>
-        <h1 class="hero__title">Location de voiture <br /><span>au Maroc, simple et claire.</span></h1>
-        <p class="hero__sub">Dès <b>299 MAD/jour</b> (≈ 30 €). Réserver en 5 minutes, assurance incluse, livraison gratuite aux aéroports. Aucun paiement en ligne, juste une avance lors de la confirmation.</p>
+        <span class="hero__eyebrow"><span class="hero__pulse"></span> Location de voiture · Demande en ligne</span>
+        <h1 class="hero__title">Location de voiture <br /><span>simple et claire.</span></h1>
+        <p class="hero__sub">Consultez les véhicules disponibles et envoyez votre demande en quelques minutes. L'agence vous confirme les dates et le tarif avant validation.</p>
         <div class="hero__actions">
           <a class="btn btn--ghost btn--lg" href="#/vehicules">Voir la flotte ${I.arrowRight()}</a>
         </div>
         <div class="hero__stats">
-          <div class="hero__stat"><b>4.9<i>/5</i></b><span>Avis clients</span></div>
-          <div class="hero__stat"><b>5min</b><span>Réservation</span></div>
-          <div class="hero__stat"><b>24/7</b><span>Livraison aéroport</span></div>
-          <div class="hero__stat"><b>0€</b><span>Frais cachés</span></div>
+          <div class="hero__stat"><b>Flotte</b><span>Véhicules disponibles</span></div>
+          <div class="hero__stat"><b>En ligne</b><span>Demande de réservation</span></div>
+          <div class="hero__stat"><b>Direct</b><span>Contact avec l'agence</span></div>
+          <div class="hero__stat"><b>Clair</b><span>Tarif confirmé avant validation</span></div>
         </div>
       </div>
       <a class="hero__scroll" href="#/vehicules" data-scroll="vehicules" aria-label="Voir les véhicules">Découvrir ${I.arrowDown()}</a>
@@ -285,8 +258,8 @@ const locations = (selected) =>
       <div class="container">
         <div class="section__head" data-reveal>
           <span class="eyebrow">Notre flotte</span>
-          <h2 class="section__title">Choisissez votre voiture, partout au Maroc</h2>
-          <p class="section__sub">3 modèles premium entretenus, propres et prêts. Un prix clair par jour, livraison gratuite à l'aéroport.</p>
+          <h2 class="section__title">Choisissez votre véhicule</h2>
+          <p class="section__sub">Découvrez les véhicules de l'agence et consultez les informations et tarifs affichés pour chacun.</p>
         </div>
         <div class="vehicles">${D.VEHICLES.length ? D.VEHICLES.map(vehicleCard).join("") : emptyFleet()}</div>
         <div class="vehicles__more" data-reveal>
@@ -299,7 +272,7 @@ const locations = (selected) =>
       <div class="container">
         <div class="trust__grid">
           <div data-reveal>
-            <span class="eyebrow">Pourquoi Leegend Cars</span>
+            <span class="eyebrow">Pourquoi ${escapeHtml(CFG.brand)}</span>
             <h2 class="section__title">Une agence locale, des engagements clairs.</h2>
             <p class="trust__lead">On garde la conversation simple : un interlocuteur unique, des prix écrits avant de réserver, et une voiture qui correspond exactement à ce qui a été annoncé.</p>
             <div class="btn-row" style="margin-top:var(--space-6)">
@@ -342,7 +315,7 @@ const locations = (selected) =>
         </div>
         <div class="process__cta" data-reveal>
           <a class="btn btn--primary btn--lg" href="#/vehicules">${I.arrowRight()} Réserver maintenant</a>
-          <p class="note">Réponse en moins de 5 minutes en journée, 7j/7.</p>
+          <p class="note">L'agence vous contactera pour confirmer votre demande.</p>
         </div>
       </div>
     </section>
@@ -352,31 +325,27 @@ const locations = (selected) =>
         <div class="local__grid">
           <div class="local__text" data-reveal>
             <span class="eyebrow">Aéroports & livraison</span>
-            <h2 class="section__title">Livraison gratuite dans tous les aéroports du Maroc.</h2>
-            <p>Leegend Cars accompagne touristes et voyageurs d'affaires avec un service simple, humain et transparent. Nous vous accueillons à la sortie du terminal dans n'importe quel aéroport du Maroc — Tanger (TNG), Nador (NDR), Casablanca (CMN), Marrakech (RAK), Agadir (AGA), Fès (FEZ), Oujda (OUJ) et les autres — sans frais supplémentaires, à toute heure, 7j/7.</p>
-            <p>Notre objectif : que vous montiez dans une voiture premium, propre et au prix exact convenu, en gardant le contact direct avec un interlocuteur unique.</p>
+            <h2 class="section__title">Une prise en charge organisée selon vos besoins.</h2>
+            <p>${escapeHtml(CFG.brand)} vous accompagne avec un service simple et transparent. Indiquez le lieu de prise en charge souhaité dans votre demande; l'agence vous confirmera les modalités et les éventuels frais avant validation.</p>
+            <p>Les conditions, le tarif et les détails de remise du véhicule vous sont confirmés directement par l'agence.</p>
             <div class="btn-row" style="margin-top:var(--space-6)">
-<a class="btn btn--primary" href="tel:${CFG.phonePrimaryTel}">${I.phone()} Appeler ${CFG.phonePrimary}</a>
+<a class="btn btn--primary" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()} Appeler ${escapeHtml(CFG.phonePrimary)}</a>
               <a class="btn btn--ghost" href="#/aeroports">Détails aéroports ${I.arrowRight()}</a>
-            </div>
-            <div class="local__photos">
-              <figure><img src="cars/Mercedes/Mercedes_pic2.jpg" alt="Voiture Leegend Cars au Maroc" loading="lazy" /></figure>
-              <figure><img src="cars/cupra/cupra_pic2.jpg" alt="Location de voiture de luxe au Maroc" loading="lazy" /></figure>
             </div>
           </div>
           <div class="local__cards">
             ${[
               {
-                t: "Livraison gratuite à l'aéroport",
-                d: "Nous vous accueillons dans tous les aéroports du Maroc, sans frais supplémentaires, à toute heure.",
+                t: "Prise en charge",
+                d: "Le lieu et l'horaire sont confirmés avec vous avant la validation de la demande.",
               },
               {
-                t: "Notre flotte premium",
-                d: "Mercedes A-Class, Volkswagen T-Roc R-Line et Cupra Formentor : des véhicules récents, entretenus et propres.",
+                t: "Une flotte adaptée",
+                d: "Consultez les véhicules, leurs caractéristiques et les tarifs disponibles sur le site.",
               },
               {
-                t: "Zones de livraison",
-                d: "Tous les aéroports du Maroc, les hôtels, les riads et les centres-villes.",
+                t: "Zones de prise en charge",
+                d: "Les lieux de remise du véhicule sont convenus directement avec l'agence.",
               },
             ]
               .map(
@@ -395,62 +364,12 @@ const locations = (selected) =>
       </div>
     </section>
 
-    <section class="section" id="destinations">
-      <div class="container">
-        <div class="section__head" data-reveal>
-          <span class="eyebrow">Road trips</span>
-          <h2 class="section__title">Avec Leegend Cars, tout le Maroc est à portée de route.</h2>
-          <p class="section__sub">Une voiture, et chaque région s'ouvre : la côte atlantique, les villes impériales, l'Atlas et le désert.</p>
-        </div>
-        <div class="dest__list">
-          ${D.DESTINATIONS.map(
-            (d, i) => `
-            <div class="dest__row" data-reveal data-reveal-delay="${(i % 4) + 1}">
-              <span class="dest__idx">0${i + 1}</span>
-              <span class="dest__name">${d.name}</span>
-              <span class="dest__desc">${d.desc}</span>
-              <span class="dest__km">${d.km}</span>
-            </div>`
-          ).join("")}
-        </div>
-        <div class="btn-row" style="margin-top:var(--space-8)" data-reveal>
-          <a class="btn btn--primary" href="#/vehicules">${I.car()} Réserver la flotte</a>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section--alt" id="avis">
-      <div class="container">
-        <div class="section__head" data-reveal>
-          <span class="eyebrow">Avis clients</span>
-          <h2 class="section__title">Ils nous ont fait confiance à Tanger.</h2>
-          <p class="section__sub">Retours de clients ayant loué chez Leegend Cars. Aucun avis n'est sélectionné, ils sont publiés tels quels.</p>
-        </div>
-        <div class="rating-hero" data-reveal>
-          <div class="rating-hero__score">
-            <b>4.9</b>
-            ${stars(5)}
-          </div>
-          <div>
-            <p class="rating-hero__label">Note moyenne <b>Avis clients</b><small>Vérifiés un par un, photos disponibles sur demande</small></p>
-            <div class="rating-stats" style="margin-top:var(--space-5)">
-              <div class="rating-stat"><b>4.9/5</b><span>Note moyenne</span></div>
-              <div class="rating-stat"><b>200+</b><span>Clients satisfaits</span></div>
-              <div class="rating-stat"><b>100%</b><span>Confirmation écrite</span></div>
-              <div class="rating-stat"><b>5min</b><span>Temps de réponse</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="reviews">${D.REVIEWS.map(reviewCard).join("")}</div>
-      </div>
-    </section>
-
     <section class="section" id="guide">
       <div class="container">
         <div class="section__head" data-reveal>
           <span class="eyebrow">Guide</span>
-          <h2 class="section__title">Location de voiture au Maroc : guide complet 2026.</h2>
-          <p class="section__sub">Tout ce qu'il faut savoir avant de louer une voiture au Maroc cette année.</p>
+          <h2 class="section__title">Guide de location de voiture.</h2>
+          <p class="section__sub">Les points à vérifier avant d'envoyer votre demande de location.</p>
         </div>
         <div class="guide">
           ${D.GUIDE.map(
@@ -462,7 +381,7 @@ const locations = (selected) =>
           ).join("")}
         </div>
         <div class="process__cta" style="margin-top:var(--space-10)" data-reveal>
-          <p class="note">Réponse en moins de 5 minutes en journée. Confirmation écrite avant validation.</p>
+          <p class="note">La réservation n'est confirmée qu'après validation par l'agence.</p>
         </div>
       </div>
     </section>
@@ -472,7 +391,7 @@ const locations = (selected) =>
         <div class="section__head section__head--center" data-reveal>
           <span class="eyebrow">FAQ</span>
           <h2 class="section__title">Questions fréquentes</h2>
-          <p class="section__sub">Documents, âge, assurance, caution, livraison à l'aéroport : tout ce qu'il faut savoir avant de louer chez Leegend Cars.</p>
+          <p class="section__sub">Documents, âge, assurance, caution, livraison à l'aéroport : tout ce qu'il faut savoir avant de louer chez ${escapeHtml(CFG.brand)}.</p>
         </div>
         ${faqList(D.HOME_FAQ)}
         <div class="process__cta" style="margin-top:var(--space-8)" data-reveal>
@@ -489,7 +408,7 @@ const locations = (selected) =>
         <div class="page-head" data-reveal>
           <span class="eyebrow">Notre flotte</span>
           <h1>Tous nos véhicules</h1>
-          <p class="lead">Citadines premium, SUV et berlines, entretenus, propres et prêts pour les aéroports du Maroc, vos hôtels ou le centre-ville. Tarifs dès 299 MAD/jour, prix final selon dates et durée.</p>
+          <p class="lead">Consultez les véhicules proposés par l'agence et leurs caractéristiques. Les prix et conditions sont confirmés selon vos dates avant validation.</p>
         </div>
         <div class="vehicles">${D.VEHICLES.length ? D.VEHICLES.map(vehicleCard).join("") : emptyFleet()}</div>
       </div>
@@ -541,7 +460,7 @@ const locations = (selected) =>
               <div class="vgallery__glow" style="background:${v.accent}"></div>
               <span class="vgallery__chip">dès <b>${money(v.priceFrom)} MAD</b> / jour</span>
               <span class="vgallery__deposit">Caution : <b>${money(v.deposit)} MAD</b></span>
-              <img class="vgallery__main" src="${photo(v, 0)}" alt="${v.name} — location au Maroc" />
+              <img class="vgallery__main" src="${photo(v, 0)}" alt="${v.name} — location" />
             </div>
             <div class="vthumbs" data-thumbs>${thumbs}</div>
 
@@ -576,9 +495,9 @@ const locations = (selected) =>
               <div class="vblock vcta" data-reveal>
                 ${ctaBand({
                   title: "Intéressé par la " + v.name + " ?",
-                  text: "Réservez en ligne, on vous confirme la disponibilité et le tarif final en moins de 5 minutes.",
-primary: callBtn(" Demander par téléphone"),
-                  note: "Réponse en moins de 5 minutes en journée.",
+                  text: "Envoyez une demande pour que l'agence confirme la disponibilité, le tarif et les conditions.",
+                  primary: callBtn(" Demander par téléphone"),
+                  note: "La demande ne confirme pas automatiquement la réservation.",
                 })}
               </div>
           </div>
@@ -610,13 +529,13 @@ primary: callBtn(" Demander par téléphone"),
   const airports = () => `
     <section class="page">
       <div class="container">
-        ${breadcrumb("Aéroports du Maroc")}
+        ${breadcrumb("Prise en charge")}
         <div class="page-head" data-reveal>
-          <span class="eyebrow">Tous les aéroports du Maroc</span>
-          <h1>Votre voiture vous attend à l'aéroport.</h1>
-          <p class="lead">Livraison gratuite dans tous les aéroports du Maroc, suivi de vol en temps réel, accueil personnalisé. Vous sortez du terminal, vous montez dans votre voiture, vous partez. <strong>10 minutes chrono.</strong></p>
+          <span class="eyebrow">Prise en charge à l'aéroport</span>
+          <h1>Organisez une prise en charge à l'aéroport.</h1>
+          <p class="lead">Indiquez l'aéroport et l'horaire souhaités. L'agence vous confirmera les possibilités de prise en charge et les frais éventuels avant validation.</p>
           <div class="btn-row">
-            <a class="btn btn--primary btn--lg" href="tel:${CFG.phonePrimaryTel}">${I.plane()} Réserver la livraison aéroport</a>
+            <a class="btn btn--primary btn--lg" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.plane()} Réserver la prise en charge</a>
             <a class="btn btn--ghost btn--lg" href="#/vehicules">Voir la flotte ${I.arrowRight()}</a>
           </div>
         </div>
@@ -630,20 +549,20 @@ primary: callBtn(" Demander par téléphone"),
             {
               num: "01",
               dur: "Avant le vol",
-              title: "Vous envoyez votre vol",
-              text: "Numéro de vol, heure d'arrivée, dates de location et véhicule souhaité. On bloque la voiture immédiatement.",
+              title: "Vous précisez votre demande",
+              text: "Indiquez le lieu, l'horaire, les dates de location et le véhicule souhaité.",
             },
             {
               num: "02",
               dur: "Suivi du vol",
-              title: "On suit votre arrivée en temps réel",
-              text: "En cas de retard, on s'adapte automatiquement. Aucun stress, aucun frais d'attente.",
+              title: "L'agence vérifie la demande",
+              text: "L'agence confirme la disponibilité, le tarif et les modalités de prise en charge.",
             },
             {
               num: "03",
-              dur: "10 min chrono",
-              title: "Accueil au terminal",
-              text: "Un agent vous attend à la sortie du terminal, dans l'aéroport de votre vol. État des lieux en 5 minutes, clés en main, c'est parti.",
+              dur: "Selon accord",
+              title: "Prise en charge",
+              text: "Le lieu et l'heure de remise sont convenus avec l'agence avant la réservation.",
             },
           ]
             .map(
@@ -668,13 +587,13 @@ primary: callBtn(" Demander par téléphone"),
           ${[
             {
               i: "tag",
-              t: "Livraison 100 % gratuite",
-              d: "Aucun frais supplémentaire, dans tous les aéroports du Maroc.",
+              t: "Lieu convenu",
+              d: "La prise en charge est organisée selon les possibilités de l'agence.",
             },
             {
               i: "clock",
-              t: "Disponible 24h/24",
-              d: "Vols de nuit, escales, retards : on est là, 7j/7.",
+              t: "Modalités confirmées",
+              d: "Les horaires et les frais éventuels sont précisés avant validation.",
             },
             {
               i: "truck",
@@ -683,8 +602,8 @@ primary: callBtn(" Demander par téléphone"),
             },
             {
               i: "mapPin",
-              t: "Position GPS exacte",
-              d: "On vous envoie notre position avec photo de l'agent par téléphone.",
+              t: "Contact direct",
+              d: "Échangez avec l'agence pour organiser votre prise en charge.",
             },
           ]
             .map(
@@ -705,28 +624,28 @@ primary: callBtn(" Demander par téléphone"),
         ${faqList([
           {
             q: "Que se passe-t-il si mon vol a du retard ?",
-            a: "Aucun problème. On surveille votre vol en temps réel et on adapte l'heure d'accueil automatiquement. Aucun frais supplémentaire.",
+            a: "Contactez l'agence dès que possible. Les ajustements et éventuels frais dépendent des conditions convenues.",
           },
           {
             q: "Où exactement on me retrouve à l'aéroport ?",
-            a: "À la sortie du terminal Arrivées, juste après les douanes. Un agent Leegend Cars vous attend avec un panneau à votre nom. On vous envoie sa position exacte par téléphone dès votre atterrissage.",
+            a: `À la sortie du terminal Arrivées, juste après les douanes. Un agent ${escapeHtml(CFG.brand)} vous attend avec un panneau à votre nom. On vous envoie sa position exacte par téléphone dès votre atterrissage.`,
           },
           {
             q: "Puis-je rendre la voiture à l'aéroport au retour ?",
-            a: "Oui, c'est gratuit. Il suffit de prévenir 24h avant. On récupère la voiture à un endroit convenu à l'aéroport ou ailleurs.",
+            a: "La restitution à l'aéroport peut être organisée selon les disponibilités et les frais confirmés par l'agence.",
           },
           {
             q: "Quel délai pour la prise en charge ?",
-            a: "État des lieux + signature en environ 5 minutes. Vous êtes au volant en 10 minutes maximum après votre sortie du terminal.",
+            a: "Le délai dépend du lieu et des modalités de remise convenus avec l'agence.",
           },
         ])}
 
         <div style="margin-top:var(--space-16)">
           ${ctaBand({
-            title: "Votre vol est dans quelques heures ?",
-            text: "Indiquez-nous votre numéro de vol et vos dates. On s'occupe du reste. Aucun paiement en ligne, vous validez après confirmation écrite.",
+            title: "Vous souhaitez une prise en charge à l'aéroport ?",
+            text: "Indiquez l'aéroport, les horaires et vos dates. L'agence vous confirmera les possibilités et les conditions.",
 primary: `<a class="btn btn--primary" href="#/vehicules">${I.arrowRight()} Réserver maintenant</a>`,
-            secondary: `<a class="btn btn--ghost" href="tel:${CFG.phonePrimaryTel}">${I.phone()} Appeler ${CFG.phonePrimary}</a>`,
+            secondary: `<a class="btn btn--ghost" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()} Appeler ${escapeHtml(CFG.phonePrimary)}</a>`,
           })}
         </div>
       </div>
@@ -739,10 +658,10 @@ primary: `<a class="btn btn--primary" href="#/vehicules">${I.arrowRight()} Rése
         ${breadcrumb("Prix & promos")}
         <div class="page-head" data-reveal>
           <span class="eyebrow">Tarifs & promotions</span>
-          <h1>Des tarifs clairs, des promos automatiques.</h1>
-          <p class="lead">Un prix clair par jour, le même pour tous, sans supplément caché. Paiement en MAD ou EUR. Plus la location est longue, plus le tarif baisse.</p>
+          <h1>Consultez les tarifs des véhicules.</h1>
+          <p class="lead">Les tarifs affichés sont indicatifs et peuvent dépendre des dates et de la durée. L'agence confirme le prix détaillé et les conditions avant validation.</p>
           <div class="btn-row">
-            <a class="btn btn--primary btn--lg" href="tel:${CFG.phonePrimaryTel}">${I.tag()} Demander mon prix exact</a>
+            <a class="btn btn--primary btn--lg" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.tag()} Demander mon prix exact</a>
             <a class="btn btn--ghost btn--lg" href="#/vehicules">Voir les véhicules ${I.arrowRight()}</a>
           </div>
         </div>
@@ -750,7 +669,7 @@ primary: `<a class="btn btn--primary" href="#/vehicules">${I.arrowRight()} Rése
         <div class="section__head" data-reveal>
           <span class="eyebrow">Nos tarifs</span>
           <h2 class="section__title">Des tarifs clairs, par véhicule.</h2>
-          <p class="section__sub">Tarifs indicatifs en MAD/jour (≈ EUR). Le tarif définitif est confirmé par écrit avant validation.</p>
+          <p class="section__sub">Les tarifs et cautions sont affichés par véhicule. Contactez l'agence pour confirmer le montant applicable à votre demande.</p>
         </div>
         <div class="price-cards">
           ${D.VEHICLES.length
@@ -773,29 +692,32 @@ primary: `<a class="btn btn--primary" href="#/vehicules">${I.arrowRight()} Rése
 
         <div class="section__head" style="margin-top:var(--space-16)" data-reveal>
           <span class="eyebrow">Inclus</span>
-          <h2 class="section__title">Toujours inclus, jamais de surprise</h2>
-          <p class="section__sub">Ce qui est inclus (et ce qui ne l'est pas)</p>
+          <h2 class="section__title">Vérifiez les conditions avant de réserver</h2>
+          <p class="section__sub">Les éléments inclus et les frais éventuels dépendent du véhicule et du contrat.</p>
         </div>
         <div class="included-grid">
           <div class="included included--in" data-reveal>
-            <h3>${I.checkCircle()} Inclus dans tous les tarifs</h3>
+            <h3>${I.checkCircle()} À confirmer avec l'agence</h3>
             <ul>
               ${[
-                "Assurance responsabilité civile",
-                "Kilométrage inclus (raisonnable)",
-                "Livraison gratuite aéroports / hôtels / centre-ville",
-                "Assistance 24h/24, 7j/7",
-                "Climatisation, véhicule propre",
-                "Confirmation écrite",
+                "Couverture d'assurance et franchise",
+                "Limites de kilométrage",
+                "Lieu et frais de prise en charge",
+                "Conditions d'assistance",
+                "Politique de carburant",
+                "Caution et moyens de paiement",
               ]
                 .map((x) => `<li>${I.check()} ${x}</li>`)
                 .join("")}
             </ul>
           </div>
           <div class="included included--out" data-reveal data-reveal-delay="1">
-            <h3>${I.x()} Non inclus</h3>
+            <h3>${I.x()} À lire dans le contrat</h3>
             <ul>
-              ${D.EXCLUDED.map((x) => `<li>${I.x()} ${x}</li>`).join("")}
+              ${[
+                "Frais et options éventuels",
+                "Annulation et modification",
+              ].map((x) => `<li>${I.x()} ${x}</li>`).join("")}
             </ul>
           </div>
         </div>
@@ -803,7 +725,7 @@ primary: `<a class="btn btn--primary" href="#/vehicules">${I.arrowRight()} Rése
         <div style="margin-top:var(--space-16)">
           ${ctaBand({
             title: "Vous avez vos dates exactes ?",
-            text: "Envoyez-nous vos dates et le véhicule souhaité. On vous renvoie un prix ferme par écrit en moins de 5 minutes. Aucun engagement.",
+            text: "Envoyez vos dates et le véhicule souhaité. L'agence vous communiquera la disponibilité, le tarif et les conditions.",
 primary: callBtn(" Obtenir mon prix exact"),
           })}
         </div>
@@ -817,31 +739,31 @@ primary: callBtn(" Obtenir mon prix exact"),
         ${breadcrumb("À propos")}
         <div class="page-head" data-reveal>
           <span class="eyebrow">L'agence</span>
-          <h1>Leegend Cars, une agence locale qui assume sa simplicité.</h1>
-          <p class="lead">Location de voitures de luxe dans tous les aéroports du Maroc : louer une voiture devrait être <strong>simple, écrit et sans surprise</strong>. Pas de salle d'attente, pas de standard automatique, pas de petits caractères.</p>
+          <h1>${escapeHtml(CFG.brand)}, une agence locale qui assume sa simplicité.</h1>
+          <p class="lead">Louer une voiture devrait être <strong>simple, clair et sans surprise</strong>. Consultez les informations disponibles et échangez directement avec l'agence avant de confirmer.</p>
         </div>
 
         <div class="prose">
           <div data-reveal>
-            <h2>Pourquoi on a créé Leegend Cars</h2>
-            <p>La plupart des locations de voiture au Maroc se ressemblent : un tarif affiché qui change à la caisse, une caution non-annoncée, un comptoir à fuir le jour du retour. Leegend Cars est l'inverse de ça.</p>
-            <p>On a construit un service où <strong>vous savez exactement ce que vous allez payer avant même d'arriver</strong>. Tout se passe par téléphone, la confirmation est écrite, et la voiture correspond exactement à celle annoncée.</p>
+            <h2>Pourquoi choisir ${escapeHtml(CFG.brand)}</h2>
+            <p>${escapeHtml(CFG.brand)} vous aide à trouver un véhicule de location avec des informations accessibles et un contact direct avec l'agence.</p>
+            <p>Les dates, le tarif, la caution et les modalités de prise en charge sont confirmés avant la validation de votre demande.</p>
           </div>
           <div data-reveal>
             <h2>Notre promesse</h2>
-            <p>Une voiture premium, à l'heure, au prix annoncé, livrée là où vous en avez besoin. N'importe quel aéroport du Maroc, un hôtel, un riad ou un centre-ville : on s'adapte.</p>
-            <div class="note-box"><strong>Zéro paiement en ligne.</strong> Vous validez seulement après confirmation écrite, et vous réglez à la prise en charge en MAD ou EUR.</div>
+            <p>Les modalités de remise du véhicule sont convenues directement avec l'agence selon le lieu et les dates souhaités.</p>
+            <div class="note-box">La demande en ligne ne confirme pas automatiquement une réservation. Attendez la confirmation de l'agence avant votre déplacement.</div>
           </div>
           <div data-reveal>
             <h2>Notre flotte</h2>
-            <p>Trois modèles premium choisis pour couvrir l'essentiel des besoins sur l'ensemble du territoire : Mercedes A-Class, Volkswagen T-Roc Pack R-Line et Cupra Formentor. Tous récents, climatisés, avec assurance incluse.</p>
-            <p>Vous cherchez quelque chose de différent (SUV 7 places, gamme supérieure) ? Demandez-nous, on cherche dans notre réseau local.</p>
+            <p>La flotte publiée sur le site présente les véhicules proposés par l'agence. Consultez chaque fiche pour ses caractéristiques et ses conditions.</p>
+            <p>Si vous avez un besoin particulier, contactez l'agence avant d'envoyer votre demande.</p>
           </div>
         </div>
 
         <div class="section__head" style="margin-top:var(--space-16)" data-reveal>
           <span class="eyebrow">Nos piliers</span>
-          <h2 class="section__title">Ce qui nous fait avancer chaque jour</h2>
+          <h2 class="section__title">Un service pensé pour simplifier votre location</h2>
         </div>
         <div class="pillars">
           ${[
@@ -853,7 +775,7 @@ primary: callBtn(" Obtenir mon prix exact"),
             {
               i: "clock",
               t: "Réactivité",
-              d: "Un interlocuteur unique. Réponse en moins de 5 minutes en journée, 7j/7.",
+              d: "Un contact direct avec l'agence pour répondre à vos questions.",
             },
             {
               i: "sparkles",
@@ -863,7 +785,7 @@ primary: callBtn(" Obtenir mon prix exact"),
             {
               i: "mapPin",
               t: "Service local",
-              d: "On connaît le Maroc, du nord au sud. On adapte la voiture, le lieu et l'horaire à votre voyage.",
+              d: "Les modalités de remise sont convenues selon votre lieu et votre horaire.",
             },
           ]
             .map(
@@ -882,7 +804,7 @@ primary: callBtn(" Obtenir mon prix exact"),
             title: "Une question, un besoin spécifique ?",
             text: "On préfère discuter. Appelez-nous, on prend le temps de comprendre votre voyage.",
             primary: callBtn(" Nous appeler"),
-            secondary: `<a class="btn btn--ghost" href="tel:${CFG.phonePrimaryTel}">${I.phone()} ${CFG.phonePrimary}</a>`,
+            secondary: `<a class="btn btn--ghost" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()} ${escapeHtml(CFG.phonePrimary)}</a>`,
           })}
         </div>
       </div>
@@ -896,44 +818,44 @@ primary: callBtn(" Obtenir mon prix exact"),
         <div class="page-head" data-reveal>
           <span class="eyebrow">On vous répond vite</span>
           <h1>Discutons. Appelez-nous, on prend le temps.</h1>
-          <p class="lead">5 minutes pour un devis, des conditions claires, et un humain qui répond. Nous sommes disponibles <strong>7j/7, 24h/24</strong>.</p>
+          <p class="lead">Contactez l'agence pour obtenir les disponibilités, les tarifs et les conditions applicables à votre demande.</p>
         </div>
 
         <div class="contact-grid">
           <div class="contact-cards">
-<a class="contact-card contact-card--success" href="tel:${CFG.phonePrimaryTel}" data-reveal>
+<a class="contact-card contact-card--success" href="tel:${phoneLink(CFG.phonePrimaryTel)}" data-reveal>
             <span class="card__icon">${I.phone()}</span>
             <span>
               <small>Appelez-nous — le plus rapide</small>
-              <b>${CFG.phonePrimary}</b>
+              <b>${escapeHtml(CFG.phonePrimary)}</b>
             </span>
           </a>
-            <a class="contact-card" href="tel:${CFG.phonePrimaryTel}" data-reveal data-reveal-delay="1">
+            <a class="contact-card" href="tel:${phoneLink(CFG.phonePrimaryTel)}" data-reveal data-reveal-delay="1">
               <span class="card__icon">${I.phone()}</span>
               <span>
                 <small>Téléphone principal</small>
-                <b>${CFG.phonePrimary}</b>
+                <b>${escapeHtml(CFG.phonePrimary)}</b>
               </span>
             </a>
-            <a class="contact-card" href="tel:${CFG.phoneSecondaryTel}" data-reveal data-reveal-delay="2">
+            <a class="contact-card" href="tel:${phoneLink(CFG.phoneSecondaryTel)}" data-reveal data-reveal-delay="2">
               <span class="card__icon">${I.phone()}</span>
               <span>
                 <small>Téléphone secondaire</small>
-                <b>${CFG.phoneSecondary}</b>
+                <b>${escapeHtml(CFG.phoneSecondary)}</b>
               </span>
             </a>
             <div class="contact-card" data-reveal data-reveal-delay="3">
               <span class="card__icon">${I.mapPin()}</span>
               <span>
                 <small>Où nous trouver</small>
-                <b>${CFG.address}</b>
+                <b>${escapeHtml(CFG.address)}</b>
               </span>
             </div>
             <div class="contact-card" data-reveal data-reveal-delay="4">
               <span class="card__icon">${I.clock()}</span>
               <span>
                 <small>Disponibilité</small>
-                <b>${CFG.hours}</b>
+                <b>${escapeHtml(CFG.hours)}</b>
               </span>
             </div>
           </div>
@@ -944,8 +866,8 @@ primary: callBtn(" Obtenir mon prix exact"),
             <a class="btn btn--primary" href="#/vehicules">Choisir un véhicule ${I.arrowRight()}</a>
             <hr class="hairline" />
             <h3>Où trouver l'agence</h3>
-            <p>Nous livrons dans tous les aéroports du Maroc, ainsi qu'aux hôtels, aux riads et dans les centres-villes. Envoyez-nous votre numéro de vol : nous organisons la livraison à l'aéroport de votre choix.</p>
-            <a class="btn btn--ghost" href="${CFG.mapsUrl}" target="_blank" rel="noopener">${I.mapPin()} Ouvrir dans Google Maps</a>
+            <p>Indiquez le lieu de prise en charge souhaité; l'agence vous confirmera si elle peut y remettre le véhicule et les frais éventuels.</p>
+            <a class="btn btn--ghost" href="${escapeHtml(mapsLink())}" target="_blank" rel="noopener">${I.mapPin()} Ouvrir dans Google Maps</a>
           </div>
         </div>
       </div>
@@ -998,7 +920,7 @@ primary: callBtn(" Poser ma question"),
           <h1>Tout ce qu'il faut savoir avant de louer.</h1>
           <p class="lead">Documents, âge, caution, assurance, livraison, carburant : toutes les questions concrètes regroupées par catégorie.</p>
           <div class="btn-row">
-            <a class="btn btn--primary" href="tel:${CFG.phonePrimaryTel}">${I.phone()} Poser ma question</a>
+            <a class="btn btn--primary" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()} Poser ma question</a>
           </div>
         </div>
         <div class="faq-cats">
@@ -1013,7 +935,7 @@ primary: callBtn(" Poser ma question"),
         <div style="margin-top:var(--space-12)">
           ${ctaBand({
             title: "Votre question n'est pas listée ?",
-            text: "Appelez-nous, on vous répond en moins de 5 minutes en journée.",
+            text: "Appelez l'agence pour discuter de votre demande de location.",
             primary: callBtn(" Poser ma question"),
           })}
         </div>
@@ -1049,8 +971,8 @@ primary: callBtn(" Poser ma question"),
             <h1>Merci ${r.firstName}, on revient vers vous très vite.</h1>
             <p class="lead">Votre demande est enregistrée. <strong>Conservez la référence <code>${r.ref || ""}</code></strong> : elle nous permet de retrouver votre dossier immédiatement.<br />Nous vous appelons pour confirmer la disponibilité et le tarif final.</p>
             <div class="btn-row" style="margin-top:var(--space-6)">
-              <a class="btn btn--primary btn--lg" href="tel:${CFG.phonePrimaryTel}">${I.phone()} Appeler ${CFG.phonePrimary}</a>
-              <a class="btn btn--ghost btn--lg" href="tel:${CFG.phoneSecondaryTel}">${I.phone()} ${CFG.phoneSecondary}</a>
+              <a class="btn btn--primary btn--lg" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()} Appeler ${escapeHtml(CFG.phonePrimary)}</a>
+              <a class="btn btn--ghost btn--lg" href="tel:${phoneLink(CFG.phoneSecondaryTel)}">${I.phone()} ${escapeHtml(CFG.phoneSecondary)}</a>
             </div>
             <div class="confirm__steps">
               ${[

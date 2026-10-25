@@ -47,10 +47,10 @@ body{font-family:"DejaVu Sans",Arial,Helvetica,sans-serif;color:#111;background:
 
 .fv-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:7px}
 .fv-head__left{flex:1}
-.fv-head__mid{text-align:center;width:120px}
+.fv-head__mid{text-align:center;width:150px}
 .fv-head__right{flex:1;text-align:right;font-size:8pt;line-height:1.5}
-.ct-logo{display:block;position:relative;width:75px;height:53px;overflow:hidden;margin:0 auto 2px}
-.ct-logo img{position:absolute;left:50%;top:47.5%;width:115px;height:115px;transform:translate(-50%,-50%);max-width:none}
+.ct-logo{display:block;position:relative;width:140px;height:105px;overflow:hidden;margin:0 auto 2px}
+.ct-logo img{display:block}
 .fv-title{font-weight:700;font-size:14pt;letter-spacing:.06em}
 .fv-number{margin-top:3px;border:1.5px solid #111;border-radius:3px;padding:6px 10px;
   font-weight:700;font-size:12pt;letter-spacing:.12em;display:inline-block;min-width:190px;text-align:center}
@@ -106,12 +106,13 @@ function head(r) {
       </div>
     </div>
     <div class="fv-head__mid">
-      ${logoSvg()}
+      ${logoSvg(105, 140)}
     </div>
     <div class="fv-head__right">
-      <div>Tél: ${esc(COMPANY.phone)}</div>
-      <div>Email: ${esc(COMPANY.email)}</div>
-      ${COMPANY.addressLines.map((l) => `<div>${esc(l)}</div>`).join("")}
+      <div>Leegend Cars</div>
+      <div>10 Rue Ouarzazat Hassan, Rabat 90000</div>
+      <div>Tél: ${esc(company.phone)}</div>
+      <div>Email: ${esc(company.email)}</div>
     </div>
   </header>`;
 }
@@ -199,18 +200,18 @@ function document_(r, vehicle) {
     <div class="fv-sign">
       <div>Signature du client<div class="line"></div></div>
       <div>
-        Cachet et signature — ${esc(COMPANY.legalName)}
+        Cachet et signature — ${esc(company.legalName)}
         <div style="margin-top:4px">
-          <img src="${COMPANY.stampImg}" alt="Cachet et signature" style="max-height:85px;max-width:240px;object-fit:contain;display:block">
+          <img src="${company.stampImg}" alt="Cachet et signature" style="max-height:85px;max-width:240px;object-fit:contain;display:block">
         </div>
       </div>
     </div>
 
-    <div class="fv-foot">ICE : ${esc(COMPANY.ice)} - RC : ${esc(COMPANY.rc)}</div>
+    <div class="fv-foot">ICE : ${esc(company.ice)} - RC : ${esc(company.rc)}</div>
   </section>`;
 }
 
-export function invoiceHtml(r, vehicle) {
+export function invoiceHtml(r, vehicle, company = COMPANY) {
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <title>Facture ${esc(r.invoiceNumber)} — ${esc(vehicle?.name || r.vehicle_name || "")}</title>

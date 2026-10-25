@@ -17,10 +17,15 @@ CREATE OR REPLACE FUNCTION public.next_invoice_number() RETURNS text
 DECLARE
   annee  int;
   numero int;
+  agence uuid;
 BEGIN
+  agence := public.current_agency_id();
+  IF agence IS NULL THEN
+    RAISE EXCEPTION 'Agence invalide ou accès non autorisé' USING ERRCODE = '42501';
+  END IF;
   annee := EXTRACT(YEAR FROM now())::int;
-  INSERT INTO counters (name, value) VALUES ('invoice:' || annee, 1)
-    ON CONFLICT (name) DO UPDATE SET value = counters.value + 1
+  INSERT INTO counters (agency_id, name, value) VALUES (agence, 'invoice:' || annee, 1)
+    ON CONFLICT (agency_id, name) DO UPDATE SET value = counters.value + 1
   RETURNING value INTO numero;
   RETURN 'F' || annee || '-' || lpad(numero::text, 4, '0');
 END;

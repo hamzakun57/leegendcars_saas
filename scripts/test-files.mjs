@@ -93,12 +93,20 @@ for (const [nom, attendu] of [
 }
 check("nom renvoyant le chemin complet", nomSure("photo.jpg") === "uploads/photo.jpg", String(nomSure("photo.jpg")));
 check("nom avec préfixe déjà présent", nomSure("uploads/reservations/a.png") === "uploads/reservations/a.png");
+const agenceTest = "123e4567-e89b-12d3-a456-426614174000";
+const clePrivee = `uploads/${agenceTest}/reservations/dossier.pdf`;
+const clePhoto = `photos/photos/${agenceTest}/voiture.jpg`;
+check("nom de pièce tenant-aware accepté", nomSure(clePrivee) === clePrivee);
+check("URL photo tenant-aware normalisée", nomSure(`https://exemple.supabase.co/storage/v1/object/public/${clePhoto}`) === clePhoto);
+check("fichier d'une agence reste sous son UUID", !nomSure("uploads/autre-agence/reservations/dossier.pdf"));
 
 console.log("\n— noms attribués —");
 const v1 = valider(b64(PNG), {});
 const v2 = valider(b64(PNG), {});
 check("deux fichiers portent des noms différents", v1.nom !== v2.nom, `${v1.nom} / ${v2.nom}`);
 check("le sous-dossier est respecté", valider(b64(PNG), { sousDossier: "reservations" }).chemin.startsWith("uploads/reservations/"));
+check("les pièces sont rangées dans le tenant", valider(b64(PDF), { allowPdf: true, sousDossier: "reservations", agencyId: agenceTest }).chemin.startsWith(`uploads/${agenceTest}/reservations/`));
+check("les photos sont rangées dans le tenant", valider(b64(PNG), { sousDossier: "photos", agencyId: agenceTest }).chemin.startsWith(`photos/photos/${agenceTest}/`));
 check("décodage cohérent", decoder(b64(PNG)).length === PNG.length);
 
 console.log("\n— taille d'un lot —");

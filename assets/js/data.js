@@ -1,31 +1,46 @@
 /* Leegend Cars — données du site */
 (function () {
+  const runtime = window.LCRuntimeConfig || {};
+  const search = typeof location !== "undefined" ? location.search : "";
+  const agencySlug = (typeof URLSearchParams !== "undefined" && search ? new URLSearchParams(search).get("agency") : "") || runtime.agencySlug || "";
   const CFG = {
-    brand: "Leegend Cars",
-    tagline: "Location de voitures de luxe dans tous les aéroports du Maroc",
-    city: "Maroc",
-    phonePrimary: "+212 6 28 39 49 47",
-    phonePrimaryTel: "+212628394947",
-    phoneSecondary: "+212 6 60 81 98 57",
-    phoneSecondaryTel: "+212660819857",
-    address: "Tanger , Maroc — livraison dans tous les aéroports du pays",
-    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Tanger%2C%20Maroc",
-    hours: "7j/7 · 24h/24",
+    brand: "Votre agence",
+    tagline: "Location de voitures",
+    city: "",
+    phonePrimary: "",
+    phonePrimaryTel: "",
+    phoneSecondary: "",
+    phoneSecondaryTel: "",
+    address: "",
+    mapsUrl: "",
+    hours: "",
     year: new Date().getFullYear(),
 
     /* Source des données : « supabase » (le navigateur interroge Supabase),
        « api » (un serveur Express répond) ou « auto » (Supabase s'il est
        configuré, le serveur sinon). Les deux marches sont maintenues : rien ne
        disparaît, on change seulement qui répond. */
-    source: "auto",
+    source: runtime.source || "api",
 
     /* Clé publique : conçue pour être lue par le navigateur. Ce n'est pas un
        secret — c'est ce qui permet d'appeler Supabase sans serveur. Ce qui
        protège les données, ce sont les règles d'accès (RLS) de la base, pas
        cette clé. La clé « service_role » ne doit JAMAIS être écrite ici. */
-    supabaseUrl: "https://dqygspzmndcsbkxeiulm.supabase.co",
+    supabaseUrl: runtime.supabaseUrl || "",
+    agencySlug,
     supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWdzcHptbmRjc2JreGVpdWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTkyODEsImV4cCI6MjEwNzIzNTI4MX0.2Xw305r5GJtBn85tnVPFs8MCLgJuiPLK9gnSSmu2pZI",
   };
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character]
+    );
 
   const NAV = [
     { label: "Véhicules", href: "#/vehicules" },
@@ -37,12 +52,12 @@
   ];
 
   const FEATURES = [
-    "Assurance incluse",
-    "Assistance disponible 24h/24",
+    "Conditions d'assurance précisées par l'agence",
+    "Assistance selon les conditions de location",
     "Climatisation",
-    "Véhicules récents et entretenus",
-    "Livraison gratuite aéroports / hôtels",
-    "Kilométrage raisonnable",
+    "Caractéristiques indiquées sur chaque fiche",
+    "Modalités de prise en charge confirmées par l'agence",
+    "Kilométrage précisé avant validation",
   ];
 
   const EXCLUDED = ["Carburant", "Amendes et infractions"];
@@ -50,15 +65,15 @@
   const VEHICLE_FAQ = [
     {
       q: "Quels documents pour louer ce véhicule ?",
-      a: "Permis de conduire valide (≥ 2 ans) et pièce d'identité (CIN ou passeport). Une caution vous sera demandée.",
+      a: "Les documents requis, l'âge minimum et les conditions de caution dépendent du véhicule et sont confirmés par l'agence.",
     },
     {
       q: "Comment se passe la livraison à l'aéroport ?",
-      a: "Vous nous envoyez votre numéro de vol et heure d'arrivée. Un agent vous accueille à la sortie du terminal de l'aéroport de votre vol, partout au Maroc, sans frais supplémentaires.",
+      a: "Indiquez le lieu et l'heure souhaités. L'agence vous confirmera si la prise en charge est possible et son éventuel coût.",
     },
     {
       q: "Comment fonctionne le carburant ?",
-      a: "La voiture est livrée avec un niveau de carburant convenu, et doit être restituée au même niveau. Le carburant n'est pas inclus dans le tarif.",
+      a: "La politique de carburant applicable est précisée par l'agence avant la confirmation de la location.",
     },
   ];
 
@@ -73,23 +88,23 @@
   const TRUST = [
     {
       icon: "shield",
-      title: "Assurance incluse",
-      text: "Couverture comprise dans le tarif affiché. Caution expliquée à l'avance, libérée à la restitution.",
+      title: "Conditions précisées",
+      text: "Consultez les conditions de chaque véhicule et demandez confirmation à l'agence avant de réserver.",
     },
     {
       icon: "truck",
-      title: "Livraison gratuite",
-      text: "Aéroports du Maroc. 24h/24, 7j/7. Restitution flexible.",
+      title: "Prise en charge",
+      text: "Les modalités de remise et de restitution sont convenues directement avec l'agence.",
     },
     {
       icon: "tag",
-      title: "Prix transparents",
-      text: "Le prix annoncé par écrit est le prix final. Aucun frais surprise au moment de la prise en charge.",
+      title: "Tarif confirmé",
+      text: "Demandez le tarif détaillé et les éventuels frais avant de confirmer votre demande.",
     },
     {
       icon: "sparkles",
-      title: "Voitures soignées",
-      text: "Flotte premium récente, entretenue et nettoyée avant chaque location. Climatisation incluse.",
+      title: "Informations véhicule",
+      text: "Chaque fiche présente les caractéristiques communiquées par l'agence.",
     },
   ];
 
@@ -102,159 +117,73 @@
     },
     {
       num: "02",
-      dur: "< 5 min",
-      title: "On vous contacte par téléphone",
-      text: "Nous vous appelons pour confirmer la disponibilité et le tarif final. Une avance vous est demandée pour valider la réservation.",
+      dur: "Confirmation",
+      title: "L'agence vous répond",
+      text: "L'agence vérifie la disponibilité, le tarif et les conditions avant de confirmer la réservation.",
     },
     {
       num: "03",
-      dur: "24h/24",
-      title: "Voiture livrée",
-      text: "Aéroport, hôtel ou centre-ville, à l'heure et à l'endroit convenus : on vous accueille avec votre voiture propre, prête à rouler, assurance déjà incluse.",
+      dur: "Selon accord",
+      title: "Prise en charge",
+      text: "Le véhicule est remis au lieu et à l'heure convenus avec l'agence.",
     },
   ];
 
-  const DESTINATIONS = [
-    {
-      name: "Tanger",
-      km: "TNG · 15 km",
-      desc: "Cap Spartel, grottes d'Hercule et la marina.",
-    },
-    {
-      name: "Chefchaouen",
-      km: "TNG · 110 km",
-      desc: "La ville bleue au cœur des montagnes du Rif.",
-    },
-    {
-      name: "Tétouan",
-      km: "TNG · 60 km",
-      desc: "La perle du Nord et sa médina classée à l'UNESCO.",
-    },
-    {
-      name: "Fès",
-      km: "FEZ · 25 km",
-      desc: "La capitale spirituelle et la plus grande médina du monde.",
-    },
-    {
-      name: "Marrakech",
-      km: "RAK · 15 km",
-      desc: "Jemaa el-Fna, la palmeraie et la route des Atlas.",
-    },
-    {
-      name: "Agadir",
-      km: "AGA · 20 km",
-      desc: "La plage, le climat doux et la région de Souss-Massa.",
-    },
-    {
-      name: "Casablanca",
-      km: "CMN · 25 km",
-      desc: "La corniche, les affaires et les environs.",
-    },
-    {
-      name: "Dakhla",
-      km: "DKH · 15 km",
-      desc: "Le désert, les dunes et la route du Grand Sud.",
-    },
-  ];
-
-  const REVIEWS = [
-    {
-      name: "Karim B.",
-      car: "Cupra Formentor",
-      rating: 5,
-      text: "Livraison à l'aéroport Ibn Battouta pile à l'heure, voiture impeccable. Prix annoncé respecté. Je recommande vivement.",
-      grad: "linear-gradient(135deg, #d8392a, #7a120a)",
-    },
-    {
-      name: "Sophie L.",
-      car: "Mercedes A-Class",
-      rating: 5,
-      text: "Excellente expérience. Réponse en 5 minutes et caution claire dès le début. Service au top.",
-      grad: "linear-gradient(135deg, #25d366, #1ebe5b)",
-    },
-    {
-      name: "Mehdi A.",
-      car: "Volkswagen T-Roc R-Line",
-      rating: 5,
-      text: "Loué pour une semaine entre Tanger et Chefchaouen. Voiture récente, propre, assurance bien expliquée. Rien à redire.",
-      grad: "linear-gradient(135deg, #fbbf24, #b45309)",
-    },
-    {
-      name: "Émilie R.",
-      car: "Cupra Formentor",
-      rating: 5,
-      text: "Premier voyage au Maroc, je cherchais une agence sérieuse. Leegend Cars a tenu toutes ses promesses.",
-      grad: "linear-gradient(135deg, #818cf8, #4338ca)",
-    },
-    {
-      name: "Yassine M.",
-      car: "Mercedes A-Class",
-      rating: 4,
-      text: "Bon contact, voiture propre. Petit retard à la livraison mais l'équipe a été très réactive.",
-      grad: "linear-gradient(135deg, #f472b6, #831843)",
-    },
-    {
-      name: "Claire D.",
-      car: "Volkswagen T-Roc R-Line",
-      rating: 5,
-      text: "Tarif imbattable et confirmation écrite avant de payer. C'est ce qui m'a rassurée. Merci à toute l'équipe.",
-      grad: "linear-gradient(135deg, #38bdf8, #0c4a6e)",
-    },
-  ];
+  const REVIEWS = [];
 
   const GUIDE = [
     {
       span: true,
-      title: "Pourquoi louer une voiture au Maroc ?",
-      text: "Le Maroc se découvre en voiture : plages, médinas, routes de montagne etdéserts. Vous gagnez en liberté, vous économisez sur les trajets et vous.evitez les transports à chaque étape.",
+      title: "Pourquoi louer une voiture ?",
+      text: "Un véhicule peut faciliter vos déplacements et vous laisser organiser votre itinéraire selon vos besoins.",
     },
     {
-      title: "Location voiture dans tous les aéroports du Maroc",
-      text: "Nous livrons 7j/7 dans tous les aéroports : Tanger (TNG), Nador (NDR), Casablanca (CMN), Marrakech (RAK), Agadir (AGA), Fès (FEZ), Oujda (OUJ) et les autres. Vous recevez votre voiture dès la sortie du terminal, sans file d'attente ni surcoût caché.",
+      title: "Prise en charge à l'aéroport",
+      text: "Indiquez l'aéroport et l'horaire souhaités. L'agence vous confirmera les possibilités et les frais éventuels.",
     },
     {
       title: "Tarifs transparents",
-      text: "Le prix affiché est le prix final. Pas de frais surprise au moment de la prise en charge. Tout est confirmé par écrit.",
+      text: "Demandez le tarif détaillé et les frais éventuels avant de confirmer votre demande.",
     },
     {
       title: "Où récupérer votre voiture ?",
-      text: "Tous les aéroports du Maroc, les hôtels, les riads et les centres-villes. Vous choisissez le lieu et l'horaire.",
+      text: "Les lieux et horaires de prise en charge sont convenus directement avec l'agence.",
     },
     {
-      title: "Sans caution exagérée",
-      text: "La caution est expliquée clairement avant la signature, adaptée au véhicule premium et libérée rapidement à la restitution.",
+      title: "Caution",
+      text: "Le montant et les conditions de restitution de la caution sont précisés avant la réservation.",
     },
     {
       title: "Réservation rapide",
-      text: "Envoyez vos dates et votre lieu, recevez un devis en quelques minutes, confirmez si cela vous convient. Simple.",
+      text: "Envoyez vos dates et le lieu souhaité. L'agence vous répondra avec les disponibilités et les conditions.",
     },
     {
       span: true,
-      title: "Que visiter depuis Tanger ?",
-      text: "Cap Spartel, grottes d'Hercule, Chefchaouen, Tétouan, Akchour, Asilah, Ouazzane et les routes panoramiques du Rif. La région est riche.",
+      title: "Une demande adaptée à votre trajet",
+      text: "Précisez votre itinéraire et l'agence vous indiquera les conditions d'utilisation applicables.",
     },
   ];
 
   const HOME_FAQ = [
     {
       q: "Quels documents sont nécessaires pour louer ?",
-      a: "Un permis de conduire valide (depuis au moins 2 ans) et une pièce d'identité (CIN ou passeport) du conducteur principal. Pour les paiements par carte, la carte du conducteur principal peut être demandée pour la caution.",
+      a: "Les documents requis et l'âge minimum sont confirmés par l'agence selon le véhicule et le contrat.",
     },
     {
       q: "Y a-t-il une limite de kilométrage ?",
-      a: "Le kilométrage est inclus selon les conditions de location, qui vous sont communiquées par écrit avant validation.",
+      a: "La limite et les éventuels frais de kilométrage sont précisés dans les conditions communiquées avant validation.",
     },
     {
       q: "Comment fonctionne le carburant ?",
-      a: "La voiture est livrée avec un niveau de carburant convenu, et doit être restituée au même niveau. Le carburant n'est pas inclus dans le tarif.",
+      a: "L'agence vous indique la politique de carburant applicable avant la confirmation de la location.",
     },
     {
-      q: "Comment se passe la livraison à l'aéroport ?",
-      a: "Vous nous indiquez votre numéro de vol et l'heure d'arrivée. Un agent vous attend à la sortie du terminal avec votre voiture, dans n'importe quel aéroport du Maroc.",
+      q: "Où puis-je récupérer le véhicule ?",
+      a: "Indiquez le lieu souhaité dans votre demande. L'agence vous confirmera la disponibilité et les modalités de prise en charge.",
     },
     {
       q: "Quels moyens de paiement acceptez-vous ?",
-      a: "Paiement possible en MAD ou EUR, en espèces ou par carte. Aucun paiement en ligne : vous validez uniquement après confirmation écrite.",
+      a: "Les moyens de paiement, la caution et les délais sont confirmés directement par l'agence avant la réservation.",
     },
   ];
 
@@ -264,11 +193,11 @@
       items: [
         {
           q: "Quels documents sont nécessaires ?",
-          a: "Permis de conduire valide, pièce d'identité (CIN ou passeport), et un justificatif de domicile de moins de 3 mois.",
+          a: "L'agence vous communique les documents requis et l'âge minimum selon le véhicule avant la réservation.",
         },
         {
           q: "Un conducteur additionnel, c'est possible ?",
-          a: "Oui, sans frais. Le conducteur additionnel doit respecter les mêmes conditions (âge, permis ≥ 2 ans) et présenter ses documents à la signature.",
+          a: "Demandez confirmation à l'agence : les conditions et les éventuels frais sont précisés avant la réservation.",
         },
       ],
     },
@@ -277,11 +206,11 @@
       items: [
         {
           q: "Quels moyens de paiement acceptez-vous ?",
-          a: "Paiement possible en MAD (Dirham) ou EUR (Euros). Espèces, carte bancaire ou virement. Aucun paiement en ligne : vous validez seulement après confirmation écrite.",
+          a: "Les moyens de paiement et la caution sont indiqués par l'agence dans les conditions de réservation.",
         },
         {
           q: "Les prix affichés sont-ils les prix finaux ?",
-          a: "Oui. Le tarif affiché est le tarif final hors carburant. Tout vous est confirmé par écrit avant validation.",
+          a: "Les prix affichés sont indicatifs. L'agence confirme le tarif détaillé et les frais éventuels avant validation.",
         },
       ],
     },
@@ -290,11 +219,11 @@
       items: [
         {
           q: "L'assurance est-elle incluse dans le prix ?",
-          a: "Oui, l'assurance de base (responsabilité civile) est incluse dans tous nos tarifs. Aucun supplément à payer sur place.",
+          a: "La couverture, la franchise et les exclusions varient selon le véhicule; consultez les conditions communiquées par l'agence.",
         },
         {
           q: "Que faire en cas d'accident ou de panne ?",
-          a: "Une assistance est disponible 24h/24, 7j/7 par téléphone. On vous guide étape par étape et on s'occupe de la suite.",
+          a: "Les coordonnées et modalités d'assistance sont précisées dans les documents remis par l'agence.",
         },
       ],
     },
@@ -303,15 +232,15 @@
       items: [
         {
           q: "Comment réserver ?",
-          a: "Envoyez-nous vos dates, le lieu de prise en charge et le véhicule souhaité. Nous vous renvoyons une confirmation écrite avec le prix final en moins de 5 minutes.",
+          a: "Envoyez vos dates, le lieu de prise en charge et le véhicule souhaité. L'agence vous confirmera la disponibilité et les conditions.",
         },
         {
           q: "Annulation : ai-je des frais ?",
-          a: "Aucun frais. Vous pouvez annuler gratuitement jusqu'à 48h avant la prise en charge. Il suffit de nous prévenir par téléphone.",
+          a: "Les délais et frais d'annulation sont indiqués dans les conditions communiquées par l'agence.",
         },
         {
           q: "Puis-je modifier ma réservation ?",
-          a: "Oui, dates, lieu ou véhicule peuvent être modifiés sous réserve de disponibilité. Prévenez-nous au plus tôt.",
+          a: "Toute modification dépend de la disponibilité et des conditions de réservation. Contactez l'agence au plus tôt.",
         },
       ],
     },
@@ -319,16 +248,16 @@
       title: "Livraison & restitution",
       items: [
         {
-          q: "La livraison à l'aéroport est-elle gratuite ?",
-          a: "Oui, 100% gratuite dans tous les aéroports du Maroc, 24h/24. Vous nous indiquez votre numéro de vol et l'heure d'arrivée. Un agent vous attend à la sortie du terminal.",
+          q: "La prise en charge à l'aéroport est-elle possible ?",
+          a: "Indiquez l'aéroport et l'heure souhaités. L'agence vous confirmera si la prise en charge est possible et son coût éventuel.",
         },
         {
           q: "Et la restitution à l'aéroport ?",
-          a: "Également gratuite. Prévenez-nous 24h avant, on récupère la voiture à l'endroit convenu.",
+          a: "Le lieu et les frais éventuels de restitution sont à convenir directement avec l'agence.",
         },
         {
           q: "Livraison à l'hôtel, au riad ou dans une autre ville ?",
-          a: "Livraison gratuite dans tous les aéroports du Maroc ainsi qu'à l'hôtel, au riad ou au centre-ville, partout où nous vous livrons. Au-delà, une participation peut être proposée — toujours annoncée à l'avance.",
+          a: "Précisez le lieu souhaité dans votre demande. L'agence vous confirmera les possibilités et les frais éventuels.",
         },
       ],
     },
@@ -337,15 +266,15 @@
       items: [
         {
           q: "Comment fonctionne le carburant ?",
-          a: "Politique plein pour plein : la voiture est livrée avec un niveau convenu, et doit être restituée au même niveau. Le carburant n'est pas inclus dans le tarif.",
+          a: "La politique de carburant applicable est précisée par l'agence avant la confirmation de la location.",
         },
         {
           q: "Vos véhicules sont-ils récents ?",
-          a: "Oui, notre flotte premium est récente et entretenue. Tous nos véhicules sont vérifiés et nettoyés avant chaque location.",
+          a: "Les caractéristiques et informations d'entretien sont indiquées sur les fiches des véhicules ou confirmées par l'agence.",
         },
         {
           q: "Y a-t-il une limite de kilométrage ?",
-          a: "Le kilométrage est inclus selon des conditions raisonnables, communiquées par écrit avant validation. Pour les trajets très longs, prévenez-nous afin que nous adaptions le contrat.",
+          a: "Les limites et frais éventuels sont précisés dans les conditions communiquées avant validation.",
         },
       ],
     },
@@ -354,68 +283,27 @@
   const CONDITIONS = [
     {
       title: "Conducteur & documents",
-      list: [
-        "Âge minimum : 23 ans pour nos véhicules premium.",
-        "Permis de conduire : valide depuis au moins 2 ans.",
-        "Pièce d'identité : carte d'identité (CIN) ou passeport en cours de validité.",
-        "Justificatif de domicile : facture récente (moins de 3 mois).",
-      ],
-      note: "Tous les documents sont vérifiés à la prise en charge. Le conducteur enregistré doit être présent.",
+      text: "L'âge minimum, l'ancienneté du permis et les documents requis dépendent du véhicule et sont communiqués par l'agence avant la réservation.",
     },
     {
-      title: "Caution",
-      text: "Une caution est demandée à la prise en charge, dont le montant dépend du véhicule (entre 5 000 et 15 000 MAD environ). Elle est communiquée par écrit avant signature et intégralement restituée au retour si le véhicule est rendu dans l'état initial.",
-      note: "Modes acceptés : espèces, empreinte de carte bancaire, ou virement.",
+      title: "Tarif, caution & paiement",
+      text: "Le tarif détaillé, le montant et le mode de dépôt de la caution, ainsi que les moyens de paiement sont confirmés par l'agence avant toute validation.",
     },
     {
-      title: "Paiement",
-      list: [
-        "Paiement accepté en MAD (Dirham) ou EUR (Euros).",
-        "Espèces, carte bancaire, ou virement.",
-        "Aucun paiement en ligne : tout est réglé à la prise en charge, après confirmation écrite et signature du contrat.",
-      ],
+      title: "Assurance & utilisation",
+      text: "La couverture, les franchises, les exclusions, le kilométrage, la politique de carburant et les conditions d'utilisation applicables figurent dans les conditions de location remises par l'agence.",
     },
     {
-      title: "Assurance",
-      text: "L'assurance responsabilité civile (au tiers) est incluse dans tous nos tarifs. Une franchise peut s'appliquer en cas de sinistre responsable. Des options complémentaires (rachat de franchise, tous risques) peuvent être ajoutées sur demande.",
-      note: "La couverture, la franchise et les exclusions précises vous sont communiquées par écrit avant validation, pour chaque véhicule.",
-    },
-    {
-      title: "Kilométrage",
-      text: "Kilométrage inclus selon les conditions du contrat, communiquées par écrit avant validation. Pour les très longues distances ou les traversées du Maroc, prévenez-nous afin que nous adaptions le kilométrage et l'assurance.",
-    },
-    {
-      title: "Carburant",
-      text: "Politique : plein pour plein. Le véhicule est livré avec un niveau de carburant convenu, et doit être restitué au même niveau. Tout manquant est facturé au prix coûtant du carburant + 100 MAD de service.",
-    },
-    {
-      title: "Livraison & restitution",
-      list: [
-        "Gratuite dans tous les aéroports du Maroc, ainsi qu'à l'hôtel, au riad ou dans le centre-ville.",
-        "Horaire libre, 24h/24, 7j/7.",
-        "Restitution possible au même lieu ou ailleurs (à convenir avant).",
-        "Tout dépassement d'horaire de plus de 1h sans accord préalable est facturé au tarif journalier.",
-      ],
+      title: "Prise en charge & restitution",
+      text: "Les lieux, horaires, frais éventuels et modalités de remise ou de restitution sont convenus avec l'agence et précisés dans la confirmation de réservation.",
     },
     {
       title: "Annulation & modification",
-      text: "Annulation gratuite jusqu'à 48h avant la prise en charge. L'annulation se fait simplement par téléphone. Toute modification (dates, lieu, véhicule) est possible sous réserve de disponibilité.",
+      text: "Les délais, frais et possibilités de modification dépendent de la réservation. Consultez la confirmation et le contrat ou contactez l'agence avant toute modification.",
     },
     {
-      title: "Infractions & amendes",
-      text: "Les contraventions, amendes et frais administratifs associés restent à la charge du conducteur, et lui sont refacturés sans majoration sur la base du procès-verbal officiel.",
-    },
-    {
-      title: "Sortie du territoire marocain",
-      text: "Toute sortie du Maroc (Espagne, Algérie, Mauritanie, etc.) est interdite sans accord écrit préalable.",
-    },
-    {
-      title: "Conducteur additionnel",
-      text: "Possible sans frais supplémentaire. Le conducteur additionnel doit respecter les mêmes conditions (âge, permis valide ≥ 2 ans) et présenter ses documents à la signature.",
-    },
-    {
-      title: "Litiges",
-      text: "Tout litige relève des tribunaux de Tanger, Maroc. Notre objectif reste de discuter et trouver une solution rapide par téléphone.",
+      title: "Autres conditions",
+      text: "Les conditions contractuelles propres à chaque location prévalent. Demandez toute précision à l'agence et lisez le contrat avant de signer.",
     },
   ];
 
@@ -434,38 +322,13 @@
     { label: "Autre", code: "" },
   ];
 
-  const BABY_SEAT_DAILY = 99;
+  const BABY_SEAT_DAILY = 0;
 
-  const PICKUP_LOCATIONS = [
-    "Aéroport Tanger Ibn Battouta (TNG)",
-    "Aéroport Nador Al Massira (NDR)",
-    "Aéroport Casablanca Mohammed V (CMN)",
-    "Aéroport Marrakech Menara (RAK)",
-    "Aéroport Agadir Al Massira (AGA)",
-    "Aéroport Fès Saïss (FEZ)",
-    "Aéroport Rabat Salé (RBA)",
-    "Aéroport Oujda Angads (OUJ)",
-    "Aéroport Essaouira (ESU)",
-    "Aéroport Ouarzazate (OZZ)",
-    "Aéroport Errachidia (ERZ)",
-    "Aéroport Dakhla (DKH)",
-    "Aéroport Laâyoune (LAY)",
-    "Tanger",
-    "Tétouan",
-    "Chefchaouen",
-    "Asilah",
-    "Larache",
-    "Al Hoceï",
-    "Nador",
-    "Kénitra",
-    "Rabat",
-    "Casablanca",
-    "Oujda",
-    "Autre lieu",
-  ];
+  const PICKUP_LOCATIONS = ["À convenir avec l'agence"];
 
 window.DATA = {
       CFG,
+      escapeHtml,
       NAV,
     FEATURES,
     EXCLUDED,
@@ -477,7 +340,6 @@ window.DATA = {
       FLETTE_DETAIL: "",
     TRUST,
     PROCESS,
-    DESTINATIONS,
     REVIEWS,
     GUIDE,
     HOME_FAQ,

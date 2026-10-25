@@ -48,11 +48,20 @@
     client = window.supabase.createClient(c.supabaseUrl, c.supabaseAnonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
       db: { schema: "public" },
+      global: { fetch: tenantFetch },
     });
     return client;
   };
 
   const message = (e) => (e && e.message) || "Erreur Supabase";
+  const agencySlug = () => cfg().agencySlug || "";
+  const tenantFetch = (input, init = {}) => {
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
+    const slug = agencySlug();
+    if (slug) headers.set("x-agency-slug", slug);
+    return fetch(input, { ...init, headers });
+  };
 
   /* Les colonnes JSON sont du texte ; les anciennes versions de l'admin
      avaient stocké des objets plutôt que des chemins. */
@@ -79,6 +88,7 @@
     priceFrom: v.price_from || 0,
     deposit: v.deposit || 0,
     approx: v.approx || 0,
+    sort_order: Number(v.sort_order) || 0,
     badge: v.badge || "",
     accent: v.accent || "",
     gallery: liste(v.gallery),
@@ -99,9 +109,18 @@
       .from("vehicles")
       .select("*")
       .eq("active", 1)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true })
       .then(({ data, error }) => {
         if (error) throw new Error(message(error));
-        return { vehicles: (data || []).map(enVehiculePublic) };
+        const vehicles = (data || []).map(enVehiculePublic);
+        vehicles.sort(
+          (a, b) =>
+            (a.sort_order > 0 ? a.sort_order : Number.MAX_SAFE_INTEGER) -
+              (b.sort_order > 0 ? b.sort_order : Number.MAX_SAFE_INTEGER) ||
+            String(a.name || "").localeCompare(String(b.name || ""), "fr", { sensitivity: "base" })
+        );
+        return { vehicles };
       });
   }
 
@@ -119,6 +138,20 @@
 
   function premierVehicule() {
     return vehicules().then((f) => f.vehicles[0] || null);
+  }
+
+  function agence() {
+    const slug = agencySlug();
+    if (!slug || demandeApi()) return Promise.resolve(null);
+    return getClient()
+      .from("agencies")
+      .select("id, slug, name, settings")
+      .eq("slug", slug)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) throw new Error(message(error));
+        return data || null;
+      });
   }
 
   /* Le tarif est recalculé ici avec exactement la même règle que le serveur :
@@ -168,11 +201,11 @@
       if (!p.lastName) manquant.push("lastName");
       if (!/^\+?[\d\s().-]{6,25}$/.test(p.phone || "")) manquant.push("phone");
       if (!p.licenceNumber) manquant.push("licenceNumber");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(p.licenceDate || "")) manquant.push("licenceDate");
+      if (!window.LCDateUtils?.isIsoDate(p.licenceDate)) manquant.push("licenceDate");
       if (!p.pickup) manquant.push("pickup");
       if (!p.ret) manquant.push("ret");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(p.pickupDate || "")) manquant.push("pickupDate");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(p.returnDate || "")) manquant.push("returnDate");
+      if (!window.LCDateUtils?.isIsoDate(p.pickupDate)) manquant.push("pickupDate");
+      if (!window.LCDateUtils?.isIsoDate(p.returnDate)) manquant.push("returnDate");
       if (manquant.length) return { ok: false, error: "Champs invalides", fields: manquant };
 
       return pricing({
@@ -245,9 +278,12 @@
   /* « auto » : Supabase s'il est configuré, le serveur sinon. */
   const demande = cfg().source || "auto";
   const choisi = demande === "auto" ? (cfg().supabaseUrl ? "supabase" : "api") : demande;
+  function demandeApi() {
+    return choisi !== "supabase";
+  }
 
   window.LCData =
     choisi === "supabase"
-      ? { mode: choisi, vehicles: vehicules, pricing, vehicule, envoyerReservation }
-      : { mode: choisi, vehicles: viaApi.vehicles, envoyerReservation: viaApi.envoyerReservation };
+      ? { mode: choisi, agence, vehicles: vehicules, pricing, vehicule, envoyerReservation }
+      : { mode: choisi, agence, vehicles: viaApi.vehicles, envoyerReservation: viaApi.envoyerReservation };
 })();

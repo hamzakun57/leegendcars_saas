@@ -140,9 +140,10 @@ app.post("/sign/:token", h(async (req, res) => {
   if (!isDossierOpen(r)) {
     return res.status(410).json({ error: "Ce contrat n'est plus ouvert à la signature." });
   }
+  if (r.signature_data) return res.status(409).json({ error: "Ce contrat a déjà été signé." });
   const signature = String(req.body?.signature || "");
-  const name = String(req.body?.name || "").trim().slice(0, 120);
-  if (!name) return res.status(400).json({ error: "Merci d'indiquer votre nom complet." });
+  const name = `${r.first_name || ""} ${r.last_name || ""}`.trim().slice(0, 120);
+  if (name.length < 3) return res.status(400).json({ error: "Le nom du conducteur est manquant sur la réservation." });
   if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) || signature.length > 2_000_000) {
     return res.status(400).json({ error: "Signature invalide." });
   }

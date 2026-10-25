@@ -19,10 +19,38 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { adminShell, loginPage } from "../server/views.js";
+import { isLegacyProject } from "./saas-config.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const racine = join(here, "..");
 const p = (...b) => join(racine, ...b);
+const projectRef = process.env.SAAS_PROJECT_REF || "";
+const supabaseUrl = (process.env.SAAS_SUPABASE_URL || "").replace(/\/+$/, "");
+const supabaseAnonKey = process.env.SAAS_SUPABASE_ANON_KEY || "";
+const supabaseMode = process.env.SAAS_DATA_SOURCE === "supabase" || !!supabaseUrl;
+
+if (process.env.SAAS_DATA_SOURCE === "supabase" && !supabaseUrl) {
+  throw new Error("SAAS_SUPABASE_URL manquante; le build ne basculera pas silencieusement vers l'API Express.");
+}
+if (supabaseMode) {
+  const normalizedRef = projectRef.trim().toLowerCase();
+  const hostRef = supabaseUrl.match(/^https:\/\/([a-z0-9]+)\.supabase\.co$/i)?.[1]?.toLowerCase() || "";
+  if (!normalizedRef || !supabaseAnonKey || !hostRef || hostRef !== normalizedRef) {
+    throw new Error("Renseignez SAAS_PROJECT_REF, SAAS_SUPABASE_URL et SAAS_SUPABASE_ANON_KEY pour le nouveau projet SaaS.");
+  }
+  if (isLegacyProject(projectRef)) {
+    throw new Error("Le build SaaS refuse le projet Supabase actuellement utilisé par l'agence.");
+  }
+}
+
+const runtimeConfig = `window.LCRuntimeConfig = Object.freeze(${JSON.stringify({
+  supabaseUrl: supabaseMode ? supabaseUrl : "",
+  supabaseAnonKey: supabaseMode ? supabaseAnonKey : "",
+  source: supabaseMode ? "supabase" : "api",
+  agencySlug: (process.env.SAAS_AGENCY_SLUG || "").trim().toLowerCase(),
+})});\n`;
+await writeFile(p("runtime-config.js"), runtimeConfig, "utf8");
+console.log("runtime-config.js — configuration propre à ce déploiement");
 
 /* ---------- 1. le client Supabase ---------- */
 await mkdir(p("vendor"), { recursive: true });

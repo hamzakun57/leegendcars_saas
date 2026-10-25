@@ -11,45 +11,66 @@
   :root { color-scheme: light }
   * { box-sizing: border-box; margin: 0; padding: 0 }
   body { font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; background: #f4f6f8; color: #15181d }
-  .page { max-width: 640px; margin: 0 auto; padding: 24px 18px 60px }
-  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px }
-  .mark { width: 44px; height: 44px; border-radius: 12px; background: #c8331f; color: #fff;
-          display: grid; place-items: center; font-weight: 900; font-size: 1rem; flex-shrink: 0 }
-  h1 { font-size: 1.35rem }
-  .sub { color: #5a6069; font-size: .9rem }
-  .card { background: #fff; border: 1px solid #e2e6ec; border-radius: 16px; padding: 20px;
-          margin-bottom: 16px; box-shadow: 0 12px 30px -22px #0a0b0e55 }
-  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0;
-        border-bottom: 1px dashed #e2e6ec; font-size: .95rem }
+  .page { max-width: 680px; margin: 0 auto; padding: 28px 18px 60px }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 26px }
+  .brand-logo-wrap { position: relative; display: block; width: 92px; height: 92px;
+                     overflow: hidden; flex: 0 0 auto }
+  .brand-logo { position: absolute; left: -33.333%; top: -37.778%; width: 166.667%;
+                height: 166.667%; max-width: none; object-fit: contain }
+  .brand-name { font-size: clamp(1.6rem, 6vw, 2.2rem); line-height: 1.1; font-weight: 750;
+                letter-spacing: .01em; color: #282b30 }
+  .card { background: #fff; border: 1px solid #e2e6ec; border-radius: 10px; padding: 20px;
+          margin-bottom: 18px }
+  .welcome { background: #e8f8ef; border-left: 8px solid #27bd78; padding: 24px 22px;
+             font-size: 1.15rem; line-height: 1.55 }
+  .welcome b { font-weight: 750 }
+  .welcome p + p { margin-top: 4px }
+  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 12px 2px;
+        border-bottom: 1px solid #dfe2e5; font-size: 1.08rem }
   .kv:last-child { border: 0 }
-  .kv span { color: #5a6069 }
-  .kv b { text-align: right }
-  label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: .95rem }
-  input[type=text] { width: 100%; padding: 12px 14px; border: 1px solid #ccd2db;
-                     border-radius: 10px; font-size: 1rem }
-  .pad-wrap { position: relative; margin-top: 4px; border: 1px dashed #ccd2db;
-              border-radius: 12px; overflow: hidden; background: #fff }
+  .kv span { font-weight: 700 }
+  .kv b { text-align: right; font-weight: 450 }
+  .dates { background: #f4f5f6; font-size: 1.08rem; line-height: 1.7 }
+  .dates p + p { margin-top: 6px }
+  label { display: block; font-weight: 700; margin: 4px 0 8px; font-size: 1rem }
+  .pad-wrap { position: relative; margin-top: 4px; border: 2px dashed #aeb3b8;
+              border-radius: 10px; overflow: hidden; background: #fff }
   canvas { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair }
   .pad-hint { position: absolute; inset: 0; display: grid; place-items: center;
               color: #8b9199; font-size: .9rem; pointer-events: none }
   .pad-hint.gone { display: none }
-  .hint { color: #8b9199; font-size: .85rem; margin-top: 6px }
+  .hint { color: #707780; font-size: .9rem; margin-top: 8px }
   .row { display: flex; gap: 10px; margin-top: 14px }
-  .btn { padding: 10px 18px; border: 0; border-radius: 10px; background: #e2e6ec;
+  .btn { padding: 11px 18px; border: 0; border-radius: 10px; background: #e2e6ec;
          color: #15181d; font: 600 .95rem system-ui; cursor: pointer }
-  .btn-primary { background: #c8331f; color: #fff }
+  .btn-primary { background: #25b978; color: #fff }
   .btn:disabled { opacity: .45; cursor: default }
   .msg { margin-top: 14px; padding: 12px 14px; border-radius: 10px; font-size: .95rem; display: none }
   .msg.err { display: block; background: #ff443822; border: 1px solid #e2403499; color: #9d1d13 }
   .msg.ok  { display: block; background: #2fd07a26; border: 1px solid #1cb0658c; color: #045f37 }
-  .frame-wrap { background: #3a3a40; border-radius: 14px; padding: 14px; overflow: auto; margin-top: 16px }
+  .frame-wrap { background: #3a3a40; border-radius: 10px; padding: 12px; overflow: auto; margin-top: 10px }
+  .contract-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                      flex-wrap: wrap; margin: 24px 0 8px; color: #30343a }
   iframe { width: 100%; height: 1100px; border: 0; background: #fff; border-radius: 6px; display: block }
   .loading { text-align: center; padding: 60px 0; color: #5a6069 }
   .err-page { text-align: center; padding: 60px 16px; color: #9d1d13 }
-  a.back { display: inline-block; margin-top: 14px; color: #c8331f; font-size: .9rem }
-  .signed-box { display: flex; gap: 16px; align-items: center; flex-wrap: wrap }
-  .signed-box img { background: #fff; border-radius: 8px; padding: 6px 10px;
-                    max-width: 260px; max-height: 80px; object-fit: contain }
+  .status { margin: 0 0 16px; padding: 14px 16px; border-radius: 10px; font-weight: 600 }
+  .status:empty { display: none }
+  .status.ok { background: #e8f8ef; border: 1px solid #9ddbb9; color: #14653d }
+  .status.err { background: #ffebeb; border: 1px solid #e7aaaa; color: #9d1d13 }
+  .download { border: 0; border-radius: 9px; padding: 11px 16px; background: #25b978;
+              color: #fff; font: 700 .95rem system-ui; cursor: pointer }
+  .download:disabled { opacity: .5; cursor: default }
+  @media (max-width: 520px) {
+    .page { padding: 22px 14px 40px }
+    header { gap: 12px; margin-bottom: 20px }
+    .brand-logo-wrap { width: 76px; height: 76px }
+    .welcome { padding: 18px 16px; font-size: 1.02rem }
+    .card { padding: 16px }
+    .kv { gap: 10px; font-size: .98rem }
+    .dates { font-size: .98rem }
+    .row .btn { flex: 1 }
+  }
 </style>
 </head>
 <body>
@@ -124,33 +145,39 @@
 
     /* Header */
     var html = '<header>'
-      + '<div class="mark">LC</div>'
-      + '<div><h1>Signature du contrat</h1>'
-      + '<p class="sub">Contrat ' + e(d.contractNumber) + ' &middot; ' + e(d.brand || "Leegend Cars") + '</p>'
-      + '</div></header>';
+      + '<span class="brand-logo-wrap"><img class="brand-logo" src="' + e(data.logo) + '" alt="Logo Leegend cars"></span>'
+      + '<div class="brand-name">Leegend cars</div>'
+      + '</header>';
 
-    /* Recap card */
+    html += '<div class="card welcome">'
+      + '<p>Bonjour <b>' + e(d.driver) + '</b>,</p>'
+      + '<p>Merci de faire confiance à <b>Leegend cars</b>.</p>'
+      + '<p>Veuillez signer le contrat ci-dessous pour confirmer votre réservation n° <b>' + e(d.contractNumber) + '</b>.</p>'
+      + '</div>';
+
     html += '<div class="card">'
-      + '<div class="kv"><span>Conducteur</span><b>' + e(d.driver) + '</b></div>'
-      + '<div class="kv"><span>Permis</span><b>' + e(d.licence) + '</b></div>'
-      + '<div class="kv"><span>Prise en charge</span><b>' + e(d.pickup) + '</b></div>'
-      + '<div class="kv"><span>Retour</span><b>' + e(d.retour) + '</b></div>'
+      + '<div class="kv"><span>Véhicule :</span><b>' + e(d.vehicle) + '</b></div>'
+      + '<div class="kv"><span>Montant total :</span><b>' + e(d.total) + ' dh</b></div>'
+      + '<div class="kv"><span>Assurance :</span><b>' + e(d.insurance) + '</b></div>'
+      + '<div class="kv"><span>Livraison :</span><b>' + e(d.pickup) + '</b></div>'
+      + '<div class="kv"><span>Récupération :</span><b>' + e(d.retour) + '</b></div>'
+      + '</div>';
+
+    html += '<div class="card dates">'
+      + '<p><b>Départ :</b> ' + e(d.pickupDate) + (d.pickupTime ? ' à ' + e(d.pickupTime) : '') + '</p>'
+      + '<p><b>Retour :</b> ' + e(d.returnDate) + (d.returnTime ? ' à ' + e(d.returnTime) : '') + '</p>'
       + '</div>';
 
     if (signedAlready) {
-      /* Already signed */
-      html += '<div class="card"><div class="msg ok" style="display:block">Ce contrat a déjà été signé. Vous pouvez le télécharger ci-dessous.</div></div>';
+      html += '<div class="status ok">Votre signature est enregistrée. Le contrat signé est affiché ci-dessous.</div>';
     } else {
-      /* Signature form */
       html += '<div class="card" id="sig-card">'
-        + '<label for="sig-name">Votre nom complet</label>'
-        + '<input type="text" id="sig-name" value="' + e(d.driver) + '" placeholder="Nom et prénom" autocomplete="name">'
         + '<label for="sig-canvas">Votre signature</label>'
         + '<div class="pad-wrap">'
         + '<canvas id="sig-canvas"></canvas>'
         + '<div class="pad-hint" id="sig-hint">Signez ici avec le doigt ou la souris</div>'
         + '</div>'
-        + '<p class="hint">Le cadre ci-dessus est votre signature numérique.</p>'
+        + '<p class="hint">Signez dans le cadre avec votre doigt ou votre souris. Les informations du contrat ne sont pas modifiables.</p>'
         + '<div class="row">'
         + '<button class="btn" id="btn-clear">Effacer</button>'
         + '<button class="btn btn-primary" id="btn-send" disabled>Envoyer ma signature</button>'
@@ -160,8 +187,11 @@
     }
 
     /* Contract iframe */
-    html += '<h2 style="color:#5a6069;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px">Contrat complet</h2>'
-      + '<div class="frame-wrap"><iframe id="doc-frame" title="Contrat de location"></iframe></div>';
+    html += '<div class="contract-heading"><h2>Contrat complet</h2>'
+      + (signedAlready ? '<button class="download" id="btn-download" disabled>Télécharger le contrat signé (PDF)</button>' : '')
+      + '</div>'
+      + '<div class="frame-wrap"><iframe id="doc-frame" title="Contrat de location"></iframe></div>'
+      + '<div class="status" id="contract-status" role="status"></div>';
 
     root.innerHTML = html;
 
@@ -170,6 +200,14 @@
 
     if (!signedAlready) {
       bindSignaturePad();
+    } else {
+      document.getElementById("btn-download").addEventListener("click", function () {
+        var frame = document.getElementById("doc-frame");
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        }
+      });
     }
   }
 
@@ -178,8 +216,9 @@
     fetch(EDGE + "/contrat", {
       headers: { "Authorization": "Bearer " + cfg.key, "apikey": cfg.key }
     })
-    .then(function (r) { return r.text(); })
-    .then(function (text) {
+    .then(function (r) {
+      return r.text().then(function (text) {
+        if (!r.ok) throw new Error("Le contrat n'a pas pu être chargé.");
       var htmlContent = "";
       try {
         var data = JSON.parse(text);
@@ -189,15 +228,29 @@
           htmlContent = text;
         }
       }
-      if (!htmlContent) return;
+      if (!htmlContent) throw new Error("Le contrat reçu est vide.");
       var blob = new Blob([htmlContent], { type: "text/html; charset=utf-8" });
       var burl = URL.createObjectURL(blob);
       var iframe = document.getElementById("doc-frame");
       if (!iframe) return;
-      iframe.src = burl;
-      iframe.addEventListener("load", function () { URL.revokeObjectURL(burl); }, { once: true });
+      return new Promise(function (resolve) {
+        iframe.addEventListener("load", function () {
+          URL.revokeObjectURL(burl);
+          var button = document.getElementById("btn-download");
+          if (button) button.disabled = false;
+          resolve();
+        }, { once: true });
+        iframe.src = burl;
+      });
+      });
     })
-    .catch(function () { /* iframe stays empty — non-blocking */ });
+    .catch(function (err) {
+      var status = document.getElementById("contract-status");
+      if (status) {
+        status.className = "status err";
+        status.textContent = err.message || "Impossible de charger le contrat. Rechargez la page ou contactez l'agence.";
+      }
+    });
   }
 
   /* ------------------------------------------------------------------ pad */
@@ -275,9 +328,6 @@
     });
 
     btnSend && btnSend.addEventListener("click", function () {
-      var name = (document.getElementById("sig-name") || {}).value || "";
-      name = name.trim();
-      if (name.length < 3) { say("Merci d'indiquer votre nom complet.", "err"); return; }
       if (!hasMark)        { say("La zone de signature est vide.", "err"); return; }
       btnSend.disabled = true;
       btnSend.textContent = "Enregistrement…";
@@ -289,14 +339,22 @@
           "Authorization": "Bearer " + cfg.key,
           "apikey": cfg.key,
         },
-        body: JSON.stringify({ name: name, signature: sigData }),
+        body: JSON.stringify({ signature: sigData }),
       })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j || !j.ok) throw new Error(j && j.error ? j.error : "Envoi refusé.");
-        say("Merci, votre signature a été enregistrée. Le contrat est mis à jour.", "ok");
-        btnSend.textContent = "Signature envoyée ✓";
-        loadContractFrame();
+        return fetch(EDGE, {
+          headers: { "Authorization": "Bearer " + cfg.key, "apikey": cfg.key }
+        }).then(function (response) {
+          return response.json().then(function (fresh) {
+            if (!response.ok || !fresh || !fresh.ok || !fresh.signed) {
+              throw new Error((fresh && fresh.error) || "Signature enregistrée, mais impossible de charger le contrat signé. Rechargez la page.");
+            }
+            renderPage(fresh);
+            window.scrollTo(0, 0);
+          });
+        });
       })
       .catch(function (err) {
         say(err.message || "Envoi impossible.", "err");

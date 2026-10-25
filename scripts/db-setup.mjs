@@ -1,4 +1,4 @@
-/* Prépare la base Supabase pour Leegend Cars : applique le schéma puis crée le
+/* Prépare la base Supabase historique pour Leegend Cars : applique le schéma puis crée le
    bucket de stockage. Le schéma est idempotent : relancer la commande ne casse
    rien et ne perd aucune donnée.
    Usage : npm run db:setup */

@@ -95,7 +95,7 @@ CREATE POLICY "admin gere les reservations" ON reservations
    Sans cela, une clé anon compromise permettrait de fabriquer une réservation
    « confirmée » avec un numéro de facture et un montant encaissé. */
 CREATE OR REPLACE FUNCTION public.forcer_reservation_nouvelle() RETURNS trigger
-  LANGUAGE plpgsql AS $$
+  LANGUAGE plpgsql SET search_path = '' AS $$
   BEGIN
     NEW.created_at    := now() at time zone 'utc';
     NEW.updated_at    := now() at time zone 'utc';

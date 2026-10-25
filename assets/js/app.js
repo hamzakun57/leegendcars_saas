@@ -4,6 +4,8 @@
   const P = window.Pages;
   const I = window.Icons;
   const { CFG, wa } = D;
+  const escapeHtml = D.escapeHtml;
+  const phoneLink = (value) => String(value || "").replace(/[^\d+().-]/g, "");
 
   const root = document.getElementById("root");
 
@@ -11,9 +13,8 @@
   const headerHTML = () => `
     <header class="header" data-header>
       <div class="container header__inner">
-        <a class="header__logo" href="#/" aria-label="${CFG.brand}">
-          <img src="logo-mark.png" alt="" width="58" height="31" />
-          <span class="brand">Leegend <b>Cars</b></span>
+        <a class="header__logo" href="#/" aria-label="${escapeHtml(CFG.brand)}">
+          <span class="brand">${escapeHtml(CFG.brand)}</span>
         </a>
         <nav class="header__nav" aria-label="Navigation principale">
           ${D.NAV.map((n) => `<a href="${n.href}" data-nav="${n.href}">${n.label}</a>`).join("")}
@@ -35,7 +36,7 @@
   /* ---------- footer ---------- */
   const FOOTER_LINKS = [
     { label: "Véhicules", href: "#/vehicules" },
-    { label: "Aéroports du Maroc", href: "#/aeroports" },
+    { label: "Prise en charge", href: "#/aeroports" },
     { label: "Prix & promos", href: "#/prix-promos" },
     { label: "Destinations", href: "#/", scroll: "destinations" },
     { label: "À propos", href: "#/a-propos" },
@@ -49,19 +50,18 @@
       <div class="container">
         <div class="footer__grid">
 <div class="footer__brand">
-            <a class="footer__logo" href="#/" aria-label="${CFG.brand}">
-              <img src="logo-mark.png" alt="" width="70" height="37" />
-              <span class="brand">Leegend <b>Cars</b></span>
+            <a class="footer__logo" href="#/" aria-label="${escapeHtml(CFG.brand)}">
+              <span class="brand">${escapeHtml(CFG.brand)}</span>
             </a>
-            <p>Location de voitures de luxe dans tous les aéroports du Maroc. Livraison à l'aéroport, à l'hôtel ou au centre-ville. Réservation en ligne, prix clairs, assurance incluse.</p>
+            <p>Consultez les véhicules et envoyez une demande de réservation. Les tarifs et modalités sont confirmés par l'agence.</p>
           </div>
           <div>
             <h3 class="footer__title">Contact</h3>
             <ul class="footer__list">
-              <li><a href="tel:${CFG.phonePrimaryTel}">${CFG.phonePrimary}</a></li>
-              <li><a href="tel:${CFG.phoneSecondaryTel}">${CFG.phoneSecondary}</a></li>
-              <li><span>${CFG.address}</span></li>
-              <li><span>${CFG.hours}</span></li>
+              <li><a href="tel:${phoneLink(CFG.phonePrimaryTel)}">${escapeHtml(CFG.phonePrimary)}</a></li>
+              <li><a href="tel:${phoneLink(CFG.phoneSecondaryTel)}">${escapeHtml(CFG.phoneSecondary)}</a></li>
+              <li><span>${escapeHtml(CFG.address)}</span></li>
+              <li><span>${escapeHtml(CFG.hours)}</span></li>
             </ul>
           </div>
           <div>
@@ -78,14 +78,14 @@
           </div>
         </div>
         <div class="footer__bottom">
-          <span>© ${CFG.year} ${CFG.brand}. Tous droits réservés.</span>
-          <span>Location de voiture · Tous les aéroports du Maroc</span>
+          <span>© ${CFG.year} ${escapeHtml(CFG.brand)}. Tous droits réservés.</span>
+          <span>${escapeHtml(CFG.tagline || "Location de voitures")}${CFG.city ? ` · ${escapeHtml(CFG.city)}` : ""}</span>
         </div>
       </div>
     </footer>
     <div class="sticky-cta" aria-label="Contact rapide">
-      <a class="btn btn--ghost" href="tel:${CFG.phonePrimaryTel}">${I.phone()} Appeler</a>
-      <a class="btn btn--primary" href="tel:${CFG.phoneSecondaryTel}">${I.phone()} ${CFG.phoneSecondary}</a>
+      <a class="btn btn--ghost" href="tel:${phoneLink(CFG.phonePrimaryTel)}">${I.phone()} Appeler</a>
+      <a class="btn btn--primary" href="tel:${phoneLink(CFG.phoneSecondaryTel)}">${I.phone()} ${escapeHtml(CFG.phoneSecondary)}</a>
     </div>`;
 
   /* ---------- reveal on scroll ---------- */
@@ -123,9 +123,9 @@
   };
 
   const TITLES = {
-    "/": `Location de voiture au Maroc`,
-    "/vehicules": "Tous nos véhicules au Maroc",
-    "/aeroports": "Livraison dans tous les aéroports du Maroc",
+    "/": `Location de voiture`,
+    "/vehicules": "Tous nos véhicules",
+    "/aeroports": "Prise en charge",
     "/prix-promos": "Prix & promos",
     "/a-propos": "À propos",
     "/contact": "Contact",
@@ -403,6 +403,17 @@
         const licenceDate = req("licenceDate", "Date du permis requise");
         const passport = (get("passport").value || "").trim();
 
+        for (const [name, value, label] of [
+          ["licenceDate", licenceDate, "Date du permis"],
+          ["pickupDate", pickupDate, "Date de prise en charge"],
+          ["returnDate", returnDate, "Date de retour"],
+        ]) {
+          if (value && !window.LCDateUtils?.isIsoDate(value)) {
+            setFieldError(get(name), `${label} invalide.`);
+            ok = false;
+          }
+        }
+
         if (licenceDate && licenceDate > pickupDate) {
           setFieldError(get("licenceDate"), "La date du permis doit être avant la prise en charge.");
           ok = false;
@@ -435,7 +446,7 @@
           ? `Avec siège bébé (${seatRate} MAD/jour — ${money(seatRate * estimate.days)} MAD)`
           : "Sans";
 
-        let msg = `Bonjour Leegend Cars,\nJe souhaite réserver la ${vehicle}.\n\n👤 ${firstName} ${lastName}\n📞 ${countryCode} ${phoneRaw}\n🪪 Permis : ${licenceNumber} (délivré le ${fmt(licenceDate)})${
+        let msg = `Bonjour ${CFG.brand},\nJe souhaite réserver la ${vehicle}.\n\n👤 ${firstName} ${lastName}\n📞 ${countryCode} ${phoneRaw}\n🪪 Permis : ${licenceNumber} (délivré le ${fmt(licenceDate)})${
           passport ? `\n🛂 Passeport : ${passport}` : ""
         }`;
 
@@ -564,6 +575,43 @@
      data.js. */
   async function loadFleet() {
     try {
+      const agence = await window.LCData.agence();
+      if (agence) {
+        const settings = agence.settings && typeof agence.settings === "object" ? agence.settings : {};
+        const fields = [
+          "tagline", "city", "phonePrimary", "phonePrimaryTel", "phoneSecondary",
+          "phoneSecondaryTel", "address", "mapsUrl", "hours",
+        ];
+        D.CFG.brand = String(settings.brand || agence.name || "Votre agence");
+        for (const field of fields) {
+          if (typeof settings[field] === "string") D.CFG[field] = settings[field];
+        }
+        if (Array.isArray(settings.pickupLocations)) {
+          const locations = [...new Set(
+            settings.pickupLocations
+              .filter((location) => typeof location === "string")
+              .map((location) => location.trim())
+              .filter((location) => location.length > 0 && location.length <= 100)
+          )].slice(0, 50);
+          D.PICKUP_LOCATIONS = locations.length ? locations : ["À convenir avec l'agence"];
+        }
+        const babySeatDaily = Number(settings.babySeatDaily);
+        if (Number.isFinite(babySeatDaily) && babySeatDaily > 0 && babySeatDaily <= 5000) {
+          D.BABY_SEAT_DAILY = Math.round(babySeatDaily);
+        }
+        document.title = `${D.CFG.brand} — Location de voiture`;
+        document.querySelector('meta[name="description"]')?.setAttribute(
+          "content",
+          `${D.CFG.brand} — ${D.CFG.tagline || "Location de voitures"}${D.CFG.city ? ` à ${D.CFG.city}` : ""}.`
+        );
+        document.querySelector('meta[property="og:title"]')?.setAttribute("content", document.title);
+        document.querySelector('meta[property="og:description"]')?.setAttribute(
+          "content",
+          `${D.CFG.brand} — ${D.CFG.tagline || "Location de voitures"}`
+        );
+      } else if (D.CFG.source === "supabase") {
+        throw new Error("Agence introuvable. Vérifiez le slug d'agence du site.");
+      }
       /* Un seul appel : la bibliothèque Supabase réessaie déjà toute seule en
          cas de coupure. Un second essai de notre côté ne faisait que doubler
          le temps d'attente avant d'afficher l'erreur. */

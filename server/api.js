@@ -1,4 +1,5 @@
 import express from "express";
+import "../shared/date-utils.js";
 import {
   addBlocked, addAttachment, addPayment, clearSignature, computeTotals, countByStatus, countReservations,
   createClient, createMaintenance, createReservation, createSignatureToken, deleteAttachment, deleteBlocked,
@@ -17,7 +18,6 @@ import {
 
 const RES_STATUSES = ["nouvelle", "confirmee", "annulee", "livree"];
 const PAYMENT_METHODS = ["especes", "cb", "virement", "cheque"];
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** « Mercedes A-Class » ou « Citroën C3 » -> « mercedes-a-class », « citroen-c3 ». */
@@ -36,13 +36,8 @@ const int = (v) => {
   const n = parseInt(v, 10);
   return Number.isFinite(n) ? n : 0;
 };
-const isDate = (v) => ISO_DATE.test(str(v));
-/** Date au calendrier, pas seulement au format : 2026-02-30 est refusée. */
-const realDate = (v) => {
-  if (!ISO_DATE.test(str(v, 10))) return "";
-  const d = new Date(str(v, 10) + "T00:00:00");
-  return !isNaN(d) && d.toISOString().slice(0, 10) === str(v, 10) ? str(v, 10) : "";
-};
+const isDate = (v) => globalThis.LCDateUtils.isIsoDate(str(v));
+const realDate = (v) => globalThis.LCDateUtils.normalizeIsoDate(str(v, 10));
 const validTime = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(str(v)) || str(v) === "";
 
 export const api = express.Router();

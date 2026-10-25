@@ -1,6 +1,44 @@
 # ============================================================================
-# Leegend Cars — hébergement
+# Leegend Cars — hébergement de la copie SaaS
 # ============================================================================
+# La copie SaaS et l'application historique de l'agence doivent rester sur des
+# projets Supabase séparés. Ne jamais lancer une migration ou un déploiement
+# contre la configuration Supabase de l'agence.
+#
+# 0. Préparer un nouveau projet Supabase pour le SaaS
+# ----------------------------------------------------------------------------
+# Configurer uniquement les variables SAAS_* de .env.example. Le build, le
+# setup et l'import refusent le project ref historique; le setup et l'import
+# vérifient aussi que l'URL PostgreSQL pointe sur le même projet.
+# `npm run db:setup:saas` applique le schéma, les policies, les fonctions et la
+# migration multi-agences au projet indiqué par SAAS_DATABASE_URL.
+#
+# Créer un propriétaire et son agence :
+#   npm run agency:create -- <slug> "<nom de l'agence>" <email-propriétaire>
+# Exemple :
+#   npm run agency:create -- agence-exemple "Agence Exemple" admin@exemple.ma
+# Le mot de passe est généré et affiché une seule fois si l'e-mail n'existe pas.
+# Le propriétaire configure ensuite le nom public, les contacts, les horaires,
+# les lieux de prise en charge et le supplément siège bébé dans Réglages.
+#
+# Déployer le site avec SAAS_DATA_SOURCE=supabase, SAAS_PROJECT_REF,
+# SAAS_SUPABASE_URL et SAAS_SUPABASE_ANON_KEY configurés dans l'environnement
+# du build Netlify. SAAS_AGENCY_SLUG est facultatif; sinon le site reçoit
+# l'agence depuis `?agency=<slug>`.
+#
+# Aucun import de l'application existante n'est lancé par ces commandes. Pour
+# reprendre des données, créer une sauvegarde, choisir explicitement les
+# données/fichiers et réaliser un import contrôlé dans le nouveau projet SaaS.
+# Le script d'import refuse une agence cible déjà occupée et exige :
+#   npm run migrate:sqlite -- --agency <slug> --confirm-target
+# Il n'a pas été exécuté. Ne le lancer qu'après validation de l'agence cible,
+# des fichiers locaux et d'une sauvegarde exploitable.
+# La facturation récurrente automatique est hors périmètre de la V1.
+#
+# Le mode Express / `npm run db:setup` ci-dessous reste un mode mono-agence
+# historique et ne constitue pas une installation multi-tenant.
+#
+# ---------------------------------------------------------------------------
 # Le site est désormais « client-first » :
 #
 #   Netlify          sert les fichiers (site public + back-office)
@@ -17,18 +55,17 @@
 # ---------------------------------------------------------------------------
 # 1. Préparer la base
 # ---------------------------------------------------------------------------
-#   npm run db:setup      # tables + règles d'accès + fonctions SQL
-#   npm run db:setup      # idempotent : relançable sans risque
+#   npm run db:setup:saas # projet SaaS séparé; migration tenant incluse
 #
 # 2. Compte administrateur
 # ---------------------------------------------------------------------------
-#   node scripts/create-admin.mjs leegend.cars099@gmail.com
+#   npm run agency:create -- <slug> "<nom de l'agence>" admin@exemple.ma
 #   → affiche un mot de passe généré, affiché une seule fois
 #
 # 3. Construire les fichiers statiques
 # ---------------------------------------------------------------------------
 #   npm run build
-#   Produit : vendor/supabase.bundle.js, admin-assets/, admin/index.html,
+#   Produit : runtime-config.js, vendor/supabase.js, admin-assets/, admin/index.html,
 #   admin/login.html et les gabarits de documents pour les Edge Functions.
 #   Les pages d'administration sont générées depuis server/views.js : il n'y a
 #   donc qu'une seule version de l'écran.
@@ -37,7 +74,7 @@
 # ---------------------------------------------------------------------------
 #   npm install -g supabase
 #   supabase login
-#   supabase link --project-ref dqygspzmndcsbkxeiulm
+#   supabase link --project-ref "$SAAS_PROJECT_REF"
 #   supabase functions deploy upload
 #   supabase functions deploy document
 #   supabase functions deploy signature
@@ -90,8 +127,8 @@
 # ---------------------------------------------------------------------------
 # Répartition des modes
 # ---------------------------------------------------------------------------
-# assets/js/data.js       CFG.source : « supabase » ou « api »
-# server/public/admin-config.js   idem pour le back-office
+# assets/js/data.js       source + clé publique injectées au build depuis SAAS_*
+# server/public/admin-config.js   même configuration et agence active
 #
 # « auto » utilise Supabase s'il est configuré, le serveur sinon.
 #

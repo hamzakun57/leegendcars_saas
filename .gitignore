@@ -46,3 +46,8 @@ admin/login.html
 admin-assets/
 doc-assets/
 vendor/
+runtime-config.js
+
+Contrat*.pdf
+Signature*.pdf
+contrat_page1.PNG

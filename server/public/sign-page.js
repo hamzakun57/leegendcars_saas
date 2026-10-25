@@ -6,7 +6,6 @@
   const token = body.dataset.token;
   const pad = document.getElementById("sig-pad");
   const hint = document.getElementById("sig-hint");
-  const nameInput = document.getElementById("sig-name");
   const msg = document.getElementById("sig-msg");
   const saveBtn = document.getElementById("sig-save");
   const clearBtn = document.getElementById("sig-clear");
@@ -36,12 +35,6 @@
   });
 
   saveBtn?.addEventListener("click", async () => {
-    const name = (nameInput?.value || "").trim();
-    if (name.length < 3) {
-      say("Merci d'indiquer votre nom complet.", "err");
-      nameInput?.focus();
-      return;
-    }
     const data = signaturePad ? signaturePad.toDataURL(480) : "";
     if (!data) {
       say("La zone de signature est vide : dessinez votre signature avant d'enregistrer.", "err");
@@ -53,7 +46,7 @@
       const res = await fetch(`/sign/${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, signature: data }),
+        body: JSON.stringify({ signature: data }),
       });
       const data2 = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data2.error || "Enregistrement impossible.");

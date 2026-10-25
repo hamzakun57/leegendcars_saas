@@ -20,7 +20,7 @@ const force = process.argv.includes("--force");
    contexte isolé pour récupérer DATA sans modifier le fichier. */
 function loadFleet() {
   const src = readFileSync(join(here, "..", "assets", "js", "data.js"), "utf8");
-  const ctx = vm.createContext({ window: {} });
+  const ctx = vm.createContext({ window: {}, URLSearchParams, location: { search: "" } });
   vm.runInContext(src, ctx, { filename: "data.js" });
   if (!ctx.window.DATA || !Array.isArray(ctx.window.DATA.VEHICLES)) {
     throw new Error("VEHICLES introuvable dans assets/js/data.js");

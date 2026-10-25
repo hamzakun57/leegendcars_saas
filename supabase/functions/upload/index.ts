@@ -14,8 +14,27 @@ import {
 
 Deno.serve((requete) =>
   gerer(requete, async () => {
-    const { client } = await exigerAdmin(requete);
+    const { client, agencyId } = await exigerAdmin(requete);
     const data = await corps(requete);
+
+    /* ---------- lecture temporaire d'une pièce de dossier ---------- */
+    if (data.action === "signed-url") {
+      const cle = nomSure(data.stored_name);
+      const nomFichier = cle?.split("/").pop() || "";
+      if (
+        !cle ||
+        !cle.startsWith(`${BUCKET}/${agencyId}/`) ||
+        !/^[\w-]+\.(jpg|jpeg|png|webp|pdf)$/.test(nomFichier)
+      ) {
+        throw new ErreurHttp(400, "Fichier non reconnu.");
+      }
+      const { data: signe, error } = await client.storage
+        .from(BUCKET)
+        .createSignedUrl(cle, 5 * 60);
+      if (error) throw error;
+      if (!signe?.signedUrl) throw new Error("Impossible de créer le lien temporaire du fichier.");
+      return json({ url: new URL(signe.signedUrl, Deno.env.get("SUPABASE_URL")).toString() });
+    }
 
     /* ---------- suppression ---------- */
     if (data.action === "delete") {
@@ -26,29 +45,33 @@ Deno.serve((requete) =>
       /* Deux emplacements possibles, tous deux contraints : la photo de flotte
          dans le bucket public, la pièce de dossier dans le bucket privé. */
       const nomFichier = cle.split("/").pop() as string;
-      const cibles = [
-        { bucket: BUCKET_PHOTOS, cle: `${BUCKET_PHOTOS}/${nomFichier}` },
-        { bucket: BUCKET, cle: `${BUCKET}/${nomFichier}` },
-        { bucket: BUCKET, cle: `${BUCKET}/reservations/${nomFichier}` },
-      ];
+      const estPhoto = cle.startsWith(`${BUCKET_PHOTOS}/photos/${agencyId}/`);
+      const estPiece = cle.startsWith(`${BUCKET}/${agencyId}/`);
+      if (!estPhoto && !estPiece) throw new ErreurHttp(400, "Fichier non reconnu.");
+      const bucket = estPhoto ? BUCKET_PHOTOS : BUCKET;
+      const dossier = cle.slice(0, cle.lastIndexOf("/"));
 
-      /* Appel brut plutôt que storage.remove() : Supabase répond 400 si un
-         DELETE arrive avec un Content-Type JSON mais sans corps. On contrôle
-         donc les en-têtes, et on ne considère la suppression acquise que si
-         le stockage a réellement confirmé. */
-      const racine = Deno.env.get("SUPABASE_URL") || "";
-      const entetes = {
-        apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
-      };
       let supprime = false;
-      for (const { bucket, cle: chemin } of cibles) {
-        const r = await fetch(`${racine}/storage/v1/object/${bucket}/${chemin}`, {
-          method: "DELETE",
-          headers: entetes,
-        });
-        if (r.ok || r.status === 404) supprime = true;
+      const { data: objets, error: erreurListe } = await client.storage
+        .from(bucket)
+        .list(dossier, { search: nomFichier, limit: 1000 });
+      if (erreurListe) throw new Error(`Impossible de rechercher le fichier dans ${bucket} : ${erreurListe.message}`);
+      if (objets?.some((objet) => objet.name === nomFichier)) {
+
+        const { error: erreurSuppression } = await client.storage.from(bucket).remove([cle]);
+        if (erreurSuppression) throw new Error(`Impossible de supprimer le fichier de ${bucket} : ${erreurSuppression.message}`);
+
+        const { data: restants, error: erreurVerification } = await client.storage
+          .from(bucket)
+          .list(dossier, { search: nomFichier, limit: 1000 });
+        if (erreurVerification) throw new Error(`Impossible de vérifier la suppression dans ${bucket} : ${erreurVerification.message}`);
+        if (restants?.some((objet) => objet.name === nomFichier)) {
+          throw new Error(`Le fichier ${nomFichier} est toujours présent dans ${bucket}.`);
+        }
+        supprime = true;
       }
+      /* Suppression idempotente : une pièce déjà absente peut encore avoir
+         une ligne de métadonnées, que l'administration doit pouvoir retirer. */
       return json({ ok: true, supprime });
     }
 
@@ -63,10 +86,10 @@ Deno.serve((requete) =>
       const chemins: string[] = [];
       for (const dataUrl of data.photos.slice(0, 12)) {
         try {
-          const f = await envoyer(client, valider(dataUrl, { max: MAX_PHOTO, sousDossier: "photos" }));
-          chemins.push(cheminPublic("photos", f.nom));
+          const f = await envoyer(client, valider(dataUrl, { max: MAX_PHOTO, sousDossier: "photos", agencyId }));
+          chemins.push(cheminPublic("photos", f.nom, agencyId));
         } catch (e) {
-          avertissements.push(e.message);
+          avertissements.push(e instanceof Error ? e.message : String(e));
         }
       }
       return json({ ok: true, paths: chemins, warnings: avertissements });
@@ -94,18 +117,18 @@ Deno.serve((requete) =>
 
     for (const dataUrl of fichiers.slice(0, 6)) {
       try {
-        const f = await envoyer(client, valider(dataUrl, { max: MAX_DOC, allowPdf: true, sousDossier: "reservations" }));
+        const f = await envoyer(client, valider(dataUrl, { max: MAX_DOC, allowPdf: true, sousDossier: "reservations", agencyId }));
         await client.from("attachments").insert({
           reservation_id: Number(data.reservation_id),
           kind,
-          stored_name: f.nom,
+          stored_name: f.chemin,
           original_name: nom,
           mime: f.mime,
           size: f.taille,
           created_at: new Date().toISOString(),
         });
       } catch (e) {
-        avertissements.push(e.message);
+        avertissements.push(e instanceof Error ? e.message : String(e));
       }
     }
 

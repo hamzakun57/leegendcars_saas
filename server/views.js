@@ -8,8 +8,9 @@ const loginShell = (body) => `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Administration — Leegend Cars</title>
+<title>Administration — Gestion de location</title>
 <link rel="stylesheet" href="/admin-assets/admin.css">
+<script src="/runtime-config.js"></script>
 <script src="/admin-assets/admin-config.js"></script>
 <script src="/vendor/supabase.js"></script>
 <script src="/admin-assets/theme.js"></script></head>
@@ -19,7 +20,7 @@ export const loginPage = (needsSetup) =>
   loginShell(`
     <div class="login__card panel">
       <div class="row" style="justify-content:space-between;align-items:center">
-        <div class="brand"><span class="brand__mark">LC</span>Leegend <span>Cars</span></div>
+        <div class="brand"><span class="brand__mark">GL</span>Gestion de location</div>
         ${THEME_TOGGLE}
       </div>
       <h1>Connexion</h1>
@@ -46,7 +47,8 @@ const adminShell = () => `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Administration — Leegend Cars</title><link rel="stylesheet" href="/admin-assets/admin.css">
+<title>Administration — Gestion de location</title><link rel="stylesheet" href="/admin-assets/admin.css">
+<script src="/runtime-config.js"></script>
 <script src="/admin-assets/admin-config.js"></script>
 <script>
 (function () {
@@ -73,7 +75,7 @@ const adminShell = () => `<!doctype html>
 <script src="/admin-assets/theme.js"></script></head>
 <body>
 <header class="top"><div class="wrap">
-  <div class="brand"><span class="brand__mark">LC</span>Leegend <span>Cars</span> <span class="pill">admin</span></div>
+  <div class="brand"><span class="brand__mark">GL</span>Gestion de location <span class="pill">admin</span></div>
   <div class="row" style="margin-left:auto">
     <span class="faint" id="who"></span>
     <a class="btn ghost" href="/" target="_blank">Voir le site</a>
@@ -89,7 +91,6 @@ const adminShell = () => `<!doctype html>
     <a data-tab="cli"><span class="ic">☺</span> Clients</a>
     <div class="side__group"> exploitation</div>
     <a data-tab="veh"><span class="ic">▣</span> Flotte</a>
-    <a data-tab="avail"><span class="ic">⊘</span> Indisponibilités</a>
     <a data-tab="mnt"><span class="ic">✚</span> Maintenance</a>
     <div class="side__group">Compte</div>
     <a data-tab="set"><span class="ic">⚙</span> Réglages</a>
@@ -246,6 +247,31 @@ const adminShell = () => `<!doctype html>
         <label>Mot de passe actuel</label><input id="pw-cur" type="password" autocomplete="current-password">
         <label>Nouveau mot de passe</label><input id="pw-new" type="password" autocomplete="new-password">
         <div class="row" style="margin-top:14px"><button class="primary" id="pw-save">Enregistrer</button></div>
+        <div id="pw-msg" role="status" aria-live="polite" style="margin-top:12px"></div>
+      </div>
+      <div id="agency-settings-panel" class="hide">
+        <h2>Vitrine de l'agence</h2>
+        <p class="sub">Ces informations apparaissent sur le site public de cette agence.</p>
+        <form id="agency-settings-form" class="panel" style="max-width:720px">
+          <label for="agency-brand">Nom affiché</label><input id="agency-brand" name="brand" maxlength="80" required>
+          <label for="agency-tagline">Activité (sous le nom)</label><input id="agency-tagline" name="tagline" maxlength="120">
+          <label for="agency-city">Ville</label><input id="agency-city" name="city" maxlength="100">
+          <div class="grid2">
+            <div><label for="agency-phone">Téléphone principal</label><input id="agency-phone" name="phonePrimary" maxlength="40"></div>
+            <div><label for="agency-phone-tel">Numéro d'appel principal</label><input id="agency-phone-tel" name="phonePrimaryTel" maxlength="40"></div>
+            <div><label for="agency-phone-secondary">Téléphone secondaire</label><input id="agency-phone-secondary" name="phoneSecondary" maxlength="40"></div>
+            <div><label for="agency-phone-secondary-tel">Numéro d'appel secondaire</label><input id="agency-phone-secondary-tel" name="phoneSecondaryTel" maxlength="40"></div>
+          </div>
+          <label for="agency-address">Adresse</label><input id="agency-address" name="address" maxlength="200">
+          <label for="agency-maps">Lien Google Maps (facultatif)</label><input id="agency-maps" name="mapsUrl" type="url" maxlength="500">
+          <label for="agency-hours">Horaires</label><input id="agency-hours" name="hours" maxlength="120">
+          <label for="agency-pickup">Lieux de prise en charge (un par ligne)</label>
+          <textarea id="agency-pickup" name="pickupLocations" rows="5" maxlength="5000"></textarea>
+          <label for="agency-baby-seat">Supplément siège bébé par jour (MAD; 0 = non proposé)</label>
+          <input id="agency-baby-seat" name="babySeatDaily" type="number" min="0" max="5000" step="1">
+          <div class="row" style="margin-top:14px"><button class="primary" id="agency-settings-save">Enregistrer la vitrine</button></div>
+          <div id="agency-settings-msg" role="status" aria-live="polite" style="margin-top:12px"></div>
+        </form>
       </div>
     </section>
 
@@ -269,6 +295,7 @@ const adminShell = () => `<!doctype html>
 </div>
 <script src="/admin-assets/admin-config.js"></script>
 <script src="/vendor/supabase.js"></script>
+<script src="/shared/date-utils.js"></script>
 <script src="/admin-assets/admin-api.js"></script>
 <script src="/admin-assets/signature-pad.js"></script>
 <script src="/admin-assets/admin.js"></script>

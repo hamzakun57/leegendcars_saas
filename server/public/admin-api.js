@@ -15,6 +15,15 @@
 
   const CFG = window.LCAdminConfig || (window.DATA && window.DATA.CFG) || {};
   const MODE = CFG.source === "supabase" ? "supabase" : "api";
+  const agencyId = () => localStorage.getItem("lc_agency_id") || "";
+  const tenantFetch = (input, init = {}) => {
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
+    const id = agencyId();
+    if (id) headers.set("x-agency-id", id);
+    if (CFG.agencySlug) headers.set("x-agency-slug", CFG.agencySlug);
+    return fetch(input, { ...init, headers });
+  };
 
   /* ------------------------------------------------------------------ */
   /* Client                                                             */
@@ -32,6 +41,7 @@
     client = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {
       auth: { persistSession: true, autoRefreshToken: true, storageKey: "lc_admin_session" },
       db: { schema: "public" },
+      global: { fetch: tenantFetch },
     });
     return client;
   }
@@ -239,6 +249,22 @@
         password: corps.password,
       });
       if (error || !data?.user) throw new Error("Identifiants incorrects");
+      const { data: memberships, error: membershipError } = await c
+        .from("agency_memberships")
+        .select("agency_id, role, is_default, agencies(slug)")
+        .eq("user_id", data.user.id)
+        .eq("active", true)
+        .order("is_default", { ascending: false });
+      if (membershipError) return surErreur(membershipError);
+      let membership = CFG.agencySlug
+        ? (memberships || []).find((m) => m.agencies?.slug === CFG.agencySlug)
+        : (memberships || [])[0];
+      if (!membership) {
+        await c.auth.signOut();
+        throw new Error("Ce compte n'appartient à aucune agence.");
+      }
+      localStorage.setItem("lc_agency_id", membership.agency_id);
+      localStorage.setItem("lc_agency_slug", membership.agencies.slug);
       const admin = await estAdmin(data.user.id);
       if (!admin) {
         await c.auth.signOut();
@@ -248,6 +274,8 @@
     }
     if (seg[2] === "logout") {
       await c.auth.signOut();
+      localStorage.removeItem("lc_agency_id");
+      localStorage.removeItem("lc_agency_slug");
       return { ok: true };
     }
     if (seg[2] === "me") {
@@ -256,17 +284,122 @@
       if (!user) {
         throw new Error("Session expirée, reconnectez-vous.");
       }
-      const { data: profil } = await c.from("admin_accounts").select("role").eq("id", user.id).maybeSingle();
-      if (!profil || profil.role !== "admin") {
+      const profil = await membershipFor(user.id);
+      if (!profil || !["owner", "admin", "agent"].includes(profil.role)) {
         await c.auth.signOut().catch(() => {});
         throw new Error("Compte non autorisé.");
       }
       return { user: { username: user.email, role: profil.role }, needsSetup: false };
     }
+    if (seg[2] === "agency-settings") {
+      const { data: sessionData } = await c.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (!user) throw new Error("Session expirée, reconnectez-vous.");
+      const profil = await membershipFor(user.id);
+      if (!profil || !agencyId()) throw new Error("Compte non autorisé.");
+
+      if (methode === "GET") {
+        const { data, error } = await c
+          .from("agencies")
+          .select("id, name, settings")
+          .eq("id", agencyId())
+          .maybeSingle();
+        if (error) return surErreur(error);
+        if (!data) throw new Error("Agence introuvable.");
+        return { agency: data };
+      }
+
+      if (methode !== "PATCH" || !["owner", "admin"].includes(profil.role)) {
+        throw new Error("Seul un propriétaire ou administrateur peut modifier la vitrine.");
+      }
+      const { data: current, error: readError } = await c
+        .from("agencies")
+        .select("settings")
+        .eq("id", agencyId())
+        .maybeSingle();
+      if (readError) return surErreur(readError);
+      if (!current) throw new Error("Agence introuvable.");
+
+      const settings = current.settings && typeof current.settings === "object" ? current.settings : {};
+      const cleanText = (field, maxLength) => {
+        const value = String(corps?.[field] || "").trim();
+        if (value.length > maxLength) throw new Error(`Le champ ${field} est trop long.`);
+        return value;
+      };
+      const brand = cleanText("brand", 80);
+      if (brand.length < 2) throw new Error("Le nom affiché doit contenir au moins 2 caractères.");
+      const locations = corps?.pickupLocations;
+      if (
+        !Array.isArray(locations) ||
+        locations.length > 50 ||
+        locations.some((value) => typeof value !== "string" || value.trim().length > 100)
+      ) {
+        throw new Error("La liste des lieux de prise en charge est invalide.");
+      }
+      const babySeatDaily = Number(corps?.babySeatDaily);
+      if (!Number.isInteger(babySeatDaily) || babySeatDaily < 0 || babySeatDaily > 5000) {
+        throw new Error("Le supplément siège bébé doit être un entier entre 0 et 5 000.");
+      }
+      const cleanPhone = (field) => {
+        const value = cleanText(field, 40);
+        if (value && (!/^\+?[\d\s().-]+$/.test(value) || value.replace(/\D/g, "").length < 5)) {
+          throw new Error(`Le champ ${field} doit contenir un numéro de téléphone valide.`);
+        }
+        return value;
+      };
+      const mapsUrl = cleanText("mapsUrl", 500);
+      if (mapsUrl) {
+        let parsed;
+        try {
+          parsed = new URL(mapsUrl);
+        } catch {
+          throw new Error("Le lien Maps doit être une URL valide.");
+        }
+        if (!["https:", "http:"].includes(parsed.protocol)) {
+          throw new Error("Le lien Maps doit utiliser HTTP ou HTTPS.");
+        }
+      }
+
+      const updatedSettings = {
+        ...settings,
+        brand,
+        tagline: cleanText("tagline", 120),
+        city: cleanText("city", 100),
+        phonePrimary: cleanPhone("phonePrimary"),
+        phonePrimaryTel: cleanPhone("phonePrimaryTel"),
+        phoneSecondary: cleanPhone("phoneSecondary"),
+        phoneSecondaryTel: cleanPhone("phoneSecondaryTel"),
+        address: cleanText("address", 200),
+        mapsUrl,
+        hours: cleanText("hours", 120),
+        pickupLocations: locations.map((value) => value.trim()).filter(Boolean),
+        babySeatDaily,
+      };
+      const { data, error } = await c
+        .from("agencies")
+        .update({ settings: updatedSettings, updated_at: new Date().toISOString() })
+        .eq("id", agencyId())
+        .select("id, name, settings")
+        .maybeSingle();
+      if (error) return surErreur(error);
+      if (!data) throw new Error("La vitrine n'a pas pu être enregistrée.");
+      return { ok: true, agency: data };
+    }
     if (seg[2] === "password" && methode === "POST") {
-      const { data } = await c.auth.getSession();
-      if (!data?.user) throw new Error("Non autorisé");
-      /* Supabase demande le mot de passe actuel : c'est lui qui vérifie. */
+      const current = String(corps.current || "");
+      const next = String(corps.next || "");
+      if (!current) throw new Error("Saisissez votre mot de passe actuel.");
+      if (next.length < 8) throw new Error("Mot de passe : 8 caractères minimum.");
+      const { data: sessionData } = await c.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (!user?.email) throw new Error("Session expirée, reconnectez-vous.");
+      const { data: verified, error: verificationError } = await c.auth.signInWithPassword({
+        email: user.email,
+        password: current,
+      });
+      if (verificationError || verified?.user?.id !== user.id) {
+        throw new Error("Mot de passe actuel incorrect.");
+      }
       const { error } = await c.auth.updateUser({ password: corps.next });
       if (error) throw new Error(error.message);
       return { ok: true };
@@ -457,7 +590,14 @@
       if (methode === "GET") {
         const { data, error } = await c.from("vehicles").select("*").order("sort_order").order("name");
         if (error) return surErreur(error);
-        return { vehicles: (data || []).map(enrichirVehicule) };
+        const vehicles = (data || []).map(enrichirVehicule);
+        vehicles.sort(
+          (a, b) =>
+            (Number(a.sort_order) > 0 ? Number(a.sort_order) : Number.MAX_SAFE_INTEGER) -
+              (Number(b.sort_order) > 0 ? Number(b.sort_order) : Number.MAX_SAFE_INTEGER) ||
+            String(a.name || "").localeCompare(String(b.name || ""), "fr", { sensitivity: "base" })
+        );
+        return { vehicles };
       }
       if (methode === "POST") {
         const slug = normaliser(corps.slug || corps.name);
@@ -695,11 +835,24 @@
     }
 
     /* ---------------- pièces jointes & documents ---------------- */
-    if (seg[3] === "attachments" && methode === "DELETE") {
-      const { data, error } = await c.from("attachments").delete().eq("id", seg[4]).select("stored_name").maybeSingle();
+    if (seg[2] === "attachments" && seg.length === 5 && seg[4] === "view" && methode === "GET") {
+      const id = Number(seg[3]);
+      if (!Number.isSafeInteger(id) || id < 1) throw new Error("Pièce jointe introuvable");
+      const { data, error } = await c.from("attachments").select("stored_name").eq("id", id).maybeSingle();
       if (error) return surErreur(error);
       if (!data) throw new Error("Pièce jointe introuvable");
-      await supprimerFichier(data.stored_name);
+      return appelerFonction("upload", { action: "signed-url", stored_name: data.stored_name }, 20000);
+    }
+
+    if (seg[2] === "attachments" && seg.length === 4 && methode === "DELETE") {
+      const id = Number(seg[3]);
+      if (!Number.isSafeInteger(id) || id < 1) throw new Error("Pièce jointe introuvable");
+      const { data, error } = await c.from("attachments").select("stored_name").eq("id", id).maybeSingle();
+      if (error) return surErreur(error);
+      if (!data) throw new Error("Pièce jointe introuvable");
+      await appelerFonction("upload", { action: "delete", stored_name: data.stored_name }, 20000);
+      const { error: erreurSuppression } = await c.from("attachments").delete().eq("id", id);
+      if (erreurSuppression) return surErreur(erreurSuppression);
       return { ok: true };
     }
 
@@ -764,9 +917,7 @@
   /* Utilitaires                                                        */
   /* ------------------------------------------------------------------ */
   function estDate(v) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v || ""))) return false;
-    const d = new Date(v + "T00:00:00");
-    return !isNaN(d) && d.toISOString().slice(0, 10) === v;
+    return !!window.LCDateUtils && window.LCDateUtils.isIsoDate(v);
   }
 
   const normaliser = (s) =>
@@ -830,7 +981,12 @@
       let v = entree[cle];
       if (v === null || v === undefined) v = "";
       v = String(v).trim();
-      if (cle.endsWith("_date") || cle === "birthdate") v = estDate(v) ? v : "";
+      if (cle.endsWith("_date") || cle === "birthdate") {
+        if (v) {
+          v = window.LCDateUtils?.normalizeIsoDate(v) || "";
+          if (!v) throw new Error("Une date client est invalide. Choisissez-la avec le calendrier.");
+        }
+      }
       out[cle] = v.slice(0, 200);
     }
     if (out.client_type && ["particulier", "professionnel", "entreprise"].indexOf(out.client_type) < 0) {
@@ -959,9 +1115,21 @@
      RLS décident seules). */
   async function estAdmin(uid) {
     if (!uid) return false;
-    const { data, error } = await getClient().from("admin_accounts").select("role").eq("id", uid).maybeSingle();
-    if (error) return false;
-    return !!data && data.role === "admin";
+    const data = await membershipFor(uid);
+    return !!data;
+  }
+
+  async function membershipFor(uid) {
+    if (!uid || !agencyId()) return null;
+    const { data, error } = await getClient()
+      .from("agency_memberships")
+      .select("role")
+      .eq("user_id", uid)
+      .eq("agency_id", agencyId())
+      .eq("active", true)
+      .maybeSingle();
+    if (error) return surErreur(error);
+    return data || null;
   }
 
   /* ------------------------------------------------------------------ */
@@ -986,7 +1154,7 @@
   const CDN = new RegExp(
     "^https://" +
       String(CFG.supabaseUrl || "").replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
-      "/storage/v1/object/public/photos/photos/[A-Za-z0-9._-]+\\.(?:jpg|jpeg|png|webp)$",
+      "/storage/v1/object/public/photos/photos/(?:[0-9a-f-]{36}/)?[A-Za-z0-9._-]+\\.(?:jpg|jpeg|png|webp)$",
     "i",
   );
   const cheminSur = (p) =>
@@ -1058,7 +1226,8 @@
     delete modifs.gallery;
 
     const vehicle = await lireVehicule(slug);
-    const galerie = await composerGalerie(corps, vehicle ? vehicle.gallery : []);
+    const galerieActuelle = vehicle ? enrichirVehicule(vehicle).gallery : [];
+    const galerie = await composerGalerie(corps, galerieActuelle);
 
     const maintenant = new Date().toISOString();
     if (!vehicle) {

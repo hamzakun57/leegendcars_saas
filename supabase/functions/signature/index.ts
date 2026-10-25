@@ -11,7 +11,9 @@
  */
 import { corps, ErreurHttp, gerer, html, json } from "../_shared/http.ts";
 import { clientService } from "../_shared/auth.ts";
+import { chargerDossier } from "../_shared/dossier.ts";
 import { contractHtml } from "../_shared/contract.js";
+import { companyForAgency } from "../_shared/tenant.ts";
 
 const FORME_JETON = /^[\w-]{20,64}$/;
 
@@ -52,6 +54,7 @@ Deno.serve((requete) =>
       const { data: vehicule } = r.vehicle_slug
         ? await client.from("vehicles").select("*").eq("slug", r.vehicle_slug).maybeSingle()
         : { data: null };
+      const company = await companyForAgency(client, r.agency_id);
 
       return json({
         ok: true,
@@ -59,24 +62,35 @@ Deno.serve((requete) =>
         cle: clePublique(),
         dossier: {
           ref: r.ref,
+          brand: company.legalName,
           contractNumber: r.contract_number || r.ref,
           driver: [r.first_name, r.last_name].filter(Boolean).join(" "),
-          licence: r.licence_number || "",
-          pickup: [r.pickup, r.pickup_date].filter(Boolean).join(" · "),
-          retour: [r.ret, r.return_date].filter(Boolean).join(" · "),
           vehicle: vehicule ? [vehicule.name, vehicule.matricule].filter(Boolean).join(" · ") : r.vehicle_slug || "",
-          brand: vehicule ? String(vehicule.brand || "Leegend Cars") : "Leegend Cars",
+          total: new Intl.NumberFormat("fr-FR").format(Number(r.total || 0) + Number(r.extra_fee || 0)),
+          insurance: r.insurance || "Normale",
+          pickup: r.pickup || "",
+          retour: r.ret || "",
+          pickupDate: r.pickup_date || "",
+          pickupTime: r.pickup_time || "",
+          returnDate: r.return_date || "",
+          returnTime: r.return_time || "",
         },
+        logo: company.logo,
+        signed: !!r.signature_data,
+        signatureSignedAt: r.signature_signed_at || "",
       });
     }
 
     if (requete.method === "GET" && action === "contrat") {
       const r = await parToken(client, token);
       if (!r) throw new ErreurHttp(404, "Lien de signature introuvable ou expiré.");
+      const dossier = await chargerDossier(client, r.id);
+      if (!dossier) throw new ErreurHttp(404, "Réservation introuvable.");
+      const company = await companyForAgency(client, r.agency_id);
       const { data: vehicule } = r.vehicle_slug
         ? await client.from("vehicles").select("*").eq("slug", r.vehicle_slug).maybeSingle()
         : { data: null };
-      return json({ ok: true, html: contractHtml({ ...r, dossierOpen: true }, vehicule, { toolbar: false }) });
+      return json({ ok: true, html: contractHtml({ ...dossier, dossierOpen: true }, vehicule, { toolbar: false, company }) });
     }
 
     if (requete.method === "POST") {
@@ -87,15 +101,16 @@ Deno.serve((requete) =>
         throw new ErreurHttp(410, "Ce contrat n'est plus ouvert à la signature.");
       }
 
-      const nom = String(data.name || "").trim().slice(0, 120);
-      if (!nom) throw new ErreurHttp(400, "Merci d'indiquer votre nom complet.");
+      if (r.signature_data) throw new ErreurHttp(409, "Ce contrat a déjà été signé.");
+      const nom = [r.first_name, r.last_name].filter(Boolean).join(" ").trim().slice(0, 120);
+      if (nom.length < 3) throw new ErreurHttp(400, "Le nom du conducteur est manquant sur la réservation.");
       const signature = String(data.signature || "");
       if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) || signature.length > 2_000_000) {
         throw new ErreurHttp(400, "Signature invalide.");
       }
 
       /* Le jeton est conservé : le client peut relire son contrat signé. */
-      await client
+      const { error } = await client
         .from("reservations")
         .update({
           signature_data: signature,
@@ -106,6 +121,7 @@ Deno.serve((requete) =>
           updated_at: new Date().toISOString(),
         })
         .eq("id", r.id);
+      if (error) throw error;
 
       return json({ ok: true });
     }
@@ -115,7 +131,7 @@ Deno.serve((requete) =>
 );
 
 const e = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] ?? c));
 
 /* Page de signature : le minimal nécessaire, servie depuis la fonction pour
    que le client n'ait rien à installer. */

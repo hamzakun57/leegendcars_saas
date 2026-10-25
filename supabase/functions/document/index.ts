@@ -14,6 +14,7 @@ import { exigerAdmin } from "../_shared/auth.ts";
 import { chargerDossier } from "../_shared/dossier.ts";
 import { contractHtml } from "../_shared/contract.js";
 import { invoiceHtml } from "../_shared/invoice.js";
+import { companyForAgency } from "../_shared/tenant.ts";
 
 Deno.serve((requete) =>
   gerer(requete, async () => {
@@ -24,6 +25,7 @@ Deno.serve((requete) =>
 
     const dossier = await chargerDossier(client, id);
     if (!dossier) throw new ErreurHttp(404, "Réservation introuvable.");
+    const company = await companyForAgency(client, dossier.agency_id);
     if (dossier.status !== "confirmee" && dossier.status !== "livree") {
       throw new ErreurHttp(409, "Confirmez la réservation avant de générer le document.");
     }
@@ -66,6 +68,6 @@ Deno.serve((requete) =>
       ? await client.from("vehicles").select("*").eq("slug", dossier.vehicle_slug).maybeSingle()
       : { data: null };
 
-    return html(facture ? invoiceHtml(dossier, vehicule) : contractHtml(dossier, vehicule));
+    return html(facture ? invoiceHtml(dossier, vehicule, company) : contractHtml(dossier, vehicule, { company }));
   })
 );

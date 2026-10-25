@@ -206,6 +206,9 @@
     if (name === "veh") loadVehicles();
     if (name === "avail") loadVehicles().then(loadBlocked);
     if (name === "mnt") loadVehicles().then(loadMaintenance);
+    if (name === "set" && !$("#agency-settings-panel").classList.contains("hide")) {
+      loadAgencySettings();
+    }
   }
 
   $$(".side [data-tab]").forEach((a) =>
@@ -1013,10 +1016,15 @@
 
   function subPieces() {
     const r = DOSSIER;
+    const useSignedAttachmentUrls = window.LCAdmin?.mode === "supabase";
     const rows = r.attachments.length
       ? r.attachments.map((a) => `<tr>
           <td>${esc(KIND_LABEL[a.kind] || a.kind)}</td>
-          <td><a href="/uploads/reservations/${esc(a.stored_name)}" target="_blank">${esc(a.original_name)}</a></td>
+          <td>${
+            useSignedAttachmentUrls
+              ? `<button type="button" data-att-open="${a.id}">${esc(a.original_name)}</button>`
+              : `<a href="/uploads/reservations/${esc(a.stored_name)}" target="_blank" rel="noopener">${esc(a.original_name)}</a>`
+          }</td>
           <td class="faint">${esc(a.mime)}</td>
           <td>${(a.size / 1024).toFixed(0)} Ko</td>
           <td class="faint">${esc(dt(a.created_at))}</td>
@@ -1060,7 +1068,7 @@
           <h2 style="margin-top:0">${isContract ? "Contrat de location" : "Facture"}</h2>
           <div class="faint">${
             isContract
-              ? "Document généré à partir du dossier — format du modèle Luxe Rif Car, 2 pages, prêt à imprimer en PDF."
+              ? "Document généré à partir du dossier — format du modèle Leegend Cars, 2 pages, prêt à imprimer en PDF."
               : "Document généré à partir du dossier et des règlements enregistrés, prêt à imprimer en PDF."
           }</div>
         </div>
@@ -1103,7 +1111,7 @@
       }
       <div class="doc">
         <div class="doc__head">
-          <div><b>LUXE RIF CAR</b><div class="faint">${dl("79 Rue Al Yemen, Tangier 90060")}</div></div>
+          <div><b>Leegend Cars</b><div class="faint">${dl("10 Rue ouarzazat hassan Rabat 90000")}</div></div>
           <div style="text-align:right">
             <b>${isContract ? "Contrat de location" : "Facture"}</b>
             <div class="faint">n° ${dl(docNumber)}</div>
@@ -1146,10 +1154,6 @@
                  </table>
                </div>`
         }
-        <div class="doc__sign">
-          <div>Signature du client<div class="sign"></div></div>
-          <div>Pour Luxe Rif Car<div class="sign"></div></div>
-        </div>
       </div>
     </div>`;
   }
@@ -1457,9 +1461,30 @@
     $$("#dos-body [data-att-del]").forEach((b) =>
       b.addEventListener("click", async () => {
         if (!confirm("Supprimer cette pièce jointe ?")) return;
-        await api("/api/admin/attachments/" + b.dataset.attDel, { method: "DELETE" });
-        const fresh = (await api("/api/admin/reservations/" + r.id)).reservation;
-        await reload(fresh);
+        b.disabled = true;
+        try {
+          await api("/api/admin/attachments/" + b.dataset.attDel, { method: "DELETE" });
+          const fresh = (await api("/api/admin/reservations/" + r.id)).reservation;
+          flash("Pièce jointe supprimée.");
+          await reload(fresh);
+        } catch (e) {
+          flash(e.message || "Impossible de supprimer la pièce jointe.", "err");
+          b.disabled = false;
+        }
+      })
+    );
+    $$("#dos-body [data-att-open]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const win = window.open("", "_blank");
+        try {
+          const { url } = await api(`/api/admin/attachments/${b.dataset.attOpen}/view`);
+          if (!url) throw new Error("Impossible d'ouvrir cette pièce jointe.");
+          if (win) win.location.href = url;
+          else window.open(url, "_blank");
+        } catch (e) {
+          if (win) win.close();
+          flash(e.message || "Erreur lors de l'ouverture de la pièce jointe.", "err");
+        }
       })
     );
 
@@ -1502,6 +1527,54 @@
     ["entreprise", "Entreprise"],
   ];
   const typeLabel = (t) => (CLIENT_TYPES.find((x) => x[0] === t) || CLIENT_TYPES[0])[1];
+  const dateClientInput = (value) => {
+    return window.LCDateUtils?.normalizeIsoDate(value) || "";
+  };
+  const dateClientAffichage = (value) => {
+    const date = dateClientInput(value);
+    if (!date) return "—";
+    const [annee, mois, jour] = date.split("-").map(Number);
+    const d = new Date(annee, mois - 1, jour);
+    return d.getFullYear() === annee && d.getMonth() === mois - 1 && d.getDate() === jour
+      ? d.toLocaleDateString("fr-FR")
+      : "—";
+  };
+  const detailsClient = (client) => {
+    const lignes = [
+      ["Type", typeLabel(client.client_type)],
+      ["Nom", client.last_name],
+      ["Prénom", client.first_name],
+      ["Date de naissance", dateClientAffichage(client.birthdate)],
+      ["Nationalité", client.nationality],
+      ["Téléphone", client.phone],
+      ["E-mail", client.email],
+      ["Adresse", client.address],
+      ["N° du permis", client.licence_number],
+      ["Délivré le", dateClientAffichage(client.licence_date)],
+      ["N° CIN", client.cin],
+      ["Délivrée le", dateClientAffichage(client.cin_date)],
+      ["N° du passeport", client.passport],
+      ["Délivré le", dateClientAffichage(client.passport_date)],
+      ["N° d'entrée au Maroc", client.entry_number],
+      ["Date d'entrée", dateClientAffichage(client.entry_date)],
+      ["Notes", client.notes],
+    ];
+    openSheet(
+      client.full_name || client.last_name,
+      "Détails de la fiche client",
+      `<div class="panel">
+        <div class="grid2">
+          ${lignes.map(([label, value]) => `<div><div class="faint">${esc(label)}</div><b>${value ? esc(value) : "—"}</b></div>`).join("")}
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button type="button" class="primary" id="c-detail-edit">Modifier la fiche</button>
+          <button type="button" class="ghost" id="c-detail-close">Fermer</button>
+        </div>
+      </div>`
+    );
+    $("#c-detail-edit").addEventListener("click", () => clientForm(client));
+    $("#c-detail-close").addEventListener("click", closeSheet);
+  };
 
   let clients = [];
 
@@ -1520,10 +1593,11 @@
           <td><span class="tag">${esc(typeLabel(c.client_type))}</span></td>
           <td>${dl(c.phone)}</td>
           <td>${dl(c.email)}</td>
-          <td>${dl(c.licence_number)}${c.licence_date ? `<div class="faint">${esc(dt(c.licence_date))}</div>` : ""}</td>
+          <td>${dl(c.licence_number)}${c.licence_date ? `<div class="faint">${esc(dateClientAffichage(c.licence_date))}</div>` : ""}</td>
           <td>${dl(c.cin)}</td>
           <td>${dl(c.nationality)}</td>
           <td><div class="row" style="justify-content:flex-end;gap:6px">
+            <button data-cdetail="${c.id}">Détails</button>
             <button data-cedit="${c.id}">Modifier</button>
             <button class="danger" data-cdel="${c.id}" data-cname="${esc(c.full_name || c.last_name)}">Supprimer</button>
           </div></td>
@@ -1531,6 +1605,9 @@
       )
       .join("");
 
+    $$("[data-cdetail]").forEach((b) =>
+      b.addEventListener("click", () => detailsClient(clients.find((c) => c.id === Number(b.dataset.cdetail))))
+    );
     $$("[data-cedit]").forEach((b) =>
       b.addEventListener("click", () => clientForm(clients.find((c) => c.id === Number(b.dataset.cedit))))
     );
@@ -1579,7 +1656,7 @@
       <div class="grid3">
         ${field("Nom *", "c-ln", c.last_name, "text", "Ben ayadech")}
         ${field("Prénom", "c-fn", c.first_name, "text", "Badr")}
-        ${field("Date de naissance", "c-bd", c.birthdate, "date")}
+        ${field("Date de naissance", "c-bd", dateClientInput(c.birthdate), "date")}
         ${field("Nationalité", "c-nat", c.nationality, "text", "Marocaine")}
       </div>
 
@@ -1594,25 +1671,25 @@
       <label>Permis de conduire</label>
       <div class="grid3">
         ${field("Num permis", "c-lic", c.licence_number)}
-        ${field("Date livraison permis", "c-licd", c.licence_date, "date")}
+        ${field("Date de délivrance", "c-licd", dateClientInput(c.licence_date), "date")}
       </div>
 
       <label>CIN</label>
       <div class="grid3">
         ${field("Num CIN", "c-cin", c.cin)}
-        ${field("Date", "c-cind", c.cin_date, "date")}
+        ${field("Date de délivrance", "c-cind", dateClientInput(c.cin_date), "date")}
       </div>
 
       <label>Passeport</label>
       <div class="grid3">
         ${field("Num passeport", "c-pp", c.passport)}
-        ${field("Date", "c-ppd", c.passport_date, "date")}
+        ${field("Date de délivrance", "c-ppd", dateClientInput(c.passport_date), "date")}
       </div>
 
       <label>Numéro d'entrée au Maroc</label>
       <div class="grid3">
         ${field("Num d'entrée", "c-entry", c.entry_number)}
-        ${field("Date", "c-entryd", c.entry_date, "date")}
+        ${field("Date d'entrée", "c-entryd", dateClientInput(c.entry_date), "date")}
       </div>
 
       <label>Notes</label>
@@ -1652,6 +1729,18 @@
       if (!payload.last_name) {
         flash("Le nom est obligatoire.", "err");
         $("#c-ln").focus();
+        return;
+      }
+      const dates = [
+        ["Date de naissance", payload.birthdate],
+        ["Date de délivrance du permis", payload.licence_date],
+        ["Date de délivrance de la CIN", payload.cin_date],
+        ["Date de délivrance du passeport", payload.passport_date],
+        ["Date d'entrée au Maroc", payload.entry_date],
+      ];
+      const dateInvalide = dates.find(([label, value]) => value && !window.LCDateUtils?.isIsoDate(value));
+      if (dateInvalide) {
+        flash(`${dateInvalide[0]} invalide. Choisissez une date dans le calendrier.`, "err");
         return;
       }
       try {
@@ -1727,11 +1816,19 @@
     $$("[data-toggle]").forEach((b) =>
       b.addEventListener("click", async () => {
         const v = vehicles.find((x) => x.slug === b.dataset.toggle);
-        await api("/api/admin/vehicles/" + encodeURIComponent(v.slug), {
-          method: "PUT",
-          body: { active: !v.active },
-        });
-        loadVehicles();
+        if (!v) return flash("Véhicule introuvable. Actualisez la flotte puis réessayez.", "err");
+        b.disabled = true;
+        try {
+          await api("/api/admin/vehicles/" + encodeURIComponent(v.slug), {
+            method: "PUT",
+            body: { active: !v.active },
+          });
+          flash(v.active ? "Véhicule masqué du site." : "Véhicule affiché sur le site.");
+          await loadVehicles();
+        } catch (e) {
+          flash(e.message || "Impossible de modifier la visibilité du véhicule.", "err");
+          b.disabled = false;
+        }
       })
     );
     const sel = $("#bl-veh");
@@ -1763,7 +1860,7 @@
             <b style="font-size:16px">${esc(v.name)}</b>
             <span class="faint"> · <code>${esc(v.slug)}</code></span>
             ${v.en_service ? '<span class="tag confirmee">en service</span>' : '<span class="tag annulee">hors service</span>'}
-            ${v.active ? "" : ' <span class="tag annulee">masqué</span>'}
+            ${v.active ? '<span class="tag confirmee">Visible sur le site</span>' : '<span class="tag annulee">Masqué du site</span>'}
             <div class="faint">${esc([v.modele, v.categorie, v.couleur].filter(Boolean).join(" · ") || "—")}</div>
             <div class="faint">${esc(
               [
@@ -1777,7 +1874,7 @@
           </div>
         </div>
         <div class="row">
-          <button data-toggle="${esc(v.slug)}">${v.active ? "Masquer" : "Afficher"}</button>
+          <button data-toggle="${esc(v.slug)}">${v.active ? "Masquer du site" : "Afficher sur le site"}</button>
           <button data-edit="${esc(v.slug)}">Modifier</button>
           <button class="danger" data-del="${esc(v.slug)}">Supprimer</button>
         </div>
@@ -1889,7 +1986,8 @@
         </select></div>
         <div><label>Estimation (€)</label><input id="f-approx" type="number" value="${v.approx}"></div>
         <div><label>Badge</label><input id="f-badge" value="${esc(v.badge || "")}"></div>
-        <div><label>Ordre d'affichage</label><input id="f-sort" type="number" value="${v.sort_order || 0}"></div>
+        <div><label>Ordre d'affichage</label><input id="f-sort" type="number" min="0" value="${v.sort_order || 0}">
+          <div class="faint">1 = premier, puis ordre croissant · 0 = à la fin</div></div>
       </div>
 
       <label>Texte</label>
@@ -1904,8 +2002,6 @@
 
       <div class="row" style="margin-top:16px">
         <button type="button" class="primary" id="save">Enregistrer</button>
-        <label class="chk"><input type="checkbox" id="f-active" ${v.active ? "checked" : ""}> Visible sur le site</label>
-        <label class="chk"><input type="checkbox" id="f-service" ${v.en_service ? "checked" : ""}> En service</label>
       </div>
     </div>`
     );
@@ -1994,8 +2090,8 @@
         description: lines("#f-desc"),
         ideal_for: lines("#f-ideal"),
         tiers,
-        active: $("#f-active").checked,
-        en_service: $("#f-service").checked,
+        active: !!v.active,
+        en_service: !!v.en_service,
         keepPhotos: photos,
         removePhotos: removed,
         photos: previews,
@@ -2063,16 +2159,82 @@
   });
 
   /* ---------- settings ---------- */
-  $("#pw-save").addEventListener("click", async () => {
+  async function loadAgencySettings() {
+    const message = $("#agency-settings-msg");
+    message.className = "";
+    message.textContent = "";
     try {
+      const { agency } = await api("/api/admin/agency-settings");
+      const settings = agency.settings && typeof agency.settings === "object" ? agency.settings : {};
+      const form = $("#agency-settings-form");
+      form.elements.namedItem("brand").value = settings.brand || agency.name || "";
+      for (const field of [
+        "tagline", "city", "phonePrimary", "phonePrimaryTel", "phoneSecondary",
+        "phoneSecondaryTel", "address", "mapsUrl", "hours",
+      ]) {
+        form.elements.namedItem(field).value = settings[field] || "";
+      }
+      form.elements.namedItem("pickupLocations").value = Array.isArray(settings.pickupLocations)
+        ? settings.pickupLocations.join("\n")
+        : "";
+      form.elements.namedItem("babySeatDaily").value = String(Number(settings.babySeatDaily) || 0);
+    } catch (e) {
+      message.className = "err";
+      message.textContent = e.message || "Impossible de charger la vitrine.";
+    }
+  }
+
+  $("#agency-settings-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = $("#agency-settings-msg");
+    const button = $("#agency-settings-save");
+    const form = $("#agency-settings-form");
+    message.className = "";
+    message.textContent = "";
+    button.disabled = true;
+    try {
+      const body = Object.fromEntries(
+        [...form.elements]
+          .filter((element) => element.name && element.name !== "pickupLocations")
+          .map((element) => [element.name, element.value.trim()])
+      );
+      body.babySeatDaily = Number(body.babySeatDaily);
+      body.pickupLocations = form.elements.namedItem("pickupLocations").value
+        .split(/\r?\n/)
+        .map((location) => location.trim())
+        .filter(Boolean);
+      await api("/api/admin/agency-settings", { method: "PATCH", body });
+      message.className = "ok";
+      message.textContent = "Vitrine de l'agence enregistrée.";
+    } catch (e) {
+      message.className = "err";
+      message.textContent = e.message || "Impossible d'enregistrer la vitrine.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("#pw-save").addEventListener("click", async () => {
+    const message = $("#pw-msg");
+    const button = $("#pw-save");
+    message.className = "";
+    message.textContent = "";
+    button.disabled = true;
+    try {
+      if (!$("#pw-cur").value) throw new Error("Saisissez votre mot de passe actuel.");
+      if (!$("#pw-new").value) throw new Error("Saisissez un nouveau mot de passe.");
       await api("/api/admin/password", {
         method: "POST",
         body: { current: $("#pw-cur").value, next: $("#pw-new").value },
       });
-      flash("Mot de passe modifié.");
+      message.className = "ok";
+      message.textContent = "Mot de passe modifié.";
       $("#pw-cur").value = $("#pw-new").value = "";
     } catch (e) {
-      flash(e.message, "err");
+      message.className = "err";
+      message.textContent = e.message || "Impossible de modifier le mot de passe.";
+    } finally {
+      button.disabled = false;
     }
   });
 
@@ -2083,6 +2245,12 @@
       if (!user || !user.username) {
         location.replace("/admin/login");
         return;
+      }
+      if (
+        window.LCAdmin?.mode === "supabase" &&
+        ["owner", "admin"].includes(user.role)
+      ) {
+        $("#agency-settings-panel").classList.remove("hide");
       }
       if ($("#who")) $("#who").textContent = user.username;
       await Promise.all([loadStats(), loadReservations()]);

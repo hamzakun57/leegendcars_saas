@@ -12,11 +12,16 @@
  */
 (function () {
   "use strict";
+  const runtime = window.LCRuntimeConfig || {};
+  const agencySlug =
+    new URLSearchParams(location.search).get("agency") ||
+    runtime.agencySlug ||
+    localStorage.getItem("lc_agency_slug") ||
+    "";
   window.LCAdminConfig = {
-    supabaseUrl: "https://dqygspzmndcsbkxeiulm.supabase.co",
-    supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWdzcHptbmRjc2JreGVpdWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTkyODEsImV4cCI6MjEwNzIzNTI4MX0.2Xw305r5GJtBn85tnVPFs8MCLgJuiPLK9gnSSmu2pZI",
-    /* « supabase » : le navigateur interroge Supabase (Netlify).
-       « api »      : un serveur Express répond (fonctionnement en local). */
-    source: "supabase",
+    supabaseUrl: runtime.supabaseUrl || "",
+    supabaseAnonKey: runtime.supabaseAnonKey || "",
+    source: runtime.source || "api",
+    agencySlug,
   };
 })();

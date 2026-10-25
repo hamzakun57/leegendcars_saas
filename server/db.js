@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import "../shared/date-utils.js";
 import { many, one, query, tx } from "./pg.js";
 
 /* Toutes les fonctions qui touchent la base sont asynchrones : PostgreSQL est
@@ -11,13 +12,7 @@ export const now = () => new Date().toISOString();
 /* Toute date stockée passe par ici : format AAAA-MM-JJ *et* existence réelle
    dans le calendrier (2026-02-30 est refusé). Retourne la date normalisée, ou
    une chaîne vide si la valeur est inexploitable. */
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const isoOrEmpty = (v) => {
-  const s = String(v ?? "").trim().slice(0, 10);
-  if (!ISO_DATE.test(s)) return "";
-  const d = new Date(s + "T00:00:00");
-  return !isNaN(d) && d.toISOString().slice(0, 10) === s ? s : "";
-};
+const isoOrEmpty = (v) => globalThis.LCDateUtils.normalizeIsoDate(v);
 /* Les champs dont le nom se termine par « date » (ou « birthdate »). */
 const DATE_FIELD = /(?:_date|birthdate)$/;
 
@@ -93,8 +88,8 @@ export function rowToVehicle(row) {
 
 export async function listVehicles({ includeInactive = true } = {}) {
   const sql = includeInactive
-    ? "SELECT * FROM vehicles ORDER BY sort_order, name"
-    : "SELECT * FROM vehicles WHERE active = 1 ORDER BY sort_order, name";
+    ? "SELECT * FROM vehicles ORDER BY CASE WHEN sort_order > 0 THEN 0 ELSE 1 END, CASE WHEN sort_order > 0 THEN sort_order ELSE 0 END, lower(name)"
+    : "SELECT * FROM vehicles WHERE active = 1 ORDER BY CASE WHEN sort_order > 0 THEN 0 ELSE 1 END, CASE WHEN sort_order > 0 THEN sort_order ELSE 0 END, lower(name)";
   return (await many(sql)).map(rowToVehicle);
 }
 
@@ -727,7 +722,12 @@ function cleanClient(input) {
     let v = input[key];
     if (v === null || v === undefined) v = "";
     v = String(v).trim();
-    if (key.endsWith("_date") || key === "birthdate") v = isoOrEmpty(v);
+    if (key.endsWith("_date") || key === "birthdate") {
+      if (v) {
+        v = isoOrEmpty(v);
+        if (!v) throw new Error("Une date client est invalide. Choisissez-la avec le calendrier.");
+      }
+    }
     out[key] = v.slice(0, 200);
   }
   if ("client_type" in out && !CLIENT_TYPES.includes(out.client_type)) out.client_type = "particulier";
